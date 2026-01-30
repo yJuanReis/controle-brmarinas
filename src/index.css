@@ -1,0 +1,208 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Marina Access Control - Design System
+   Nautical-inspired professional theme with deep ocean blues and crisp whites
+   All colors in HSL format
+*/
+
+@layer base {
+  :root {
+    /* Core Backgrounds */
+    --background: 210 40% 98%;
+    --foreground: 215 35% 15%;
+
+    /* Card surfaces */
+    --card: 0 0% 100%;
+    --card-foreground: 215 35% 15%;
+
+    /* Popover surfaces */
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 35% 15%;
+
+    /* Primary - Deep Ocean Blue */
+    --primary: 210 85% 35%;
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 210 75% 95%;
+    --primary-hover: 210 85% 28%;
+
+    /* Secondary - Soft Harbor */
+    --secondary: 210 30% 95%;
+    --secondary-foreground: 215 35% 25%;
+
+    /* Muted elements */
+    --muted: 210 25% 93%;
+    --muted-foreground: 215 20% 50%;
+
+    /* Accent - Teal Marina */
+    --accent: 175 70% 40%;
+    --accent-foreground: 0 0% 100%;
+    --accent-light: 175 60% 95%;
+
+    /* Status Colors */
+    --success: 160 70% 38%;
+    --success-foreground: 0 0% 100%;
+    --success-light: 160 60% 94%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --warning-light: 38 85% 95%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --destructive-light: 0 65% 96%;
+
+    /* Borders and inputs */
+    --border: 210 25% 88%;
+    --input: 210 25% 90%;
+    --ring: 210 85% 35%;
+
+    /* Radius */
+    --radius: 0.625rem;
+
+    /* Sidebar - darker nautical */
+    --sidebar-background: 215 45% 12%;
+    --sidebar-foreground: 210 30% 90%;
+    --sidebar-primary: 175 70% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 215 40% 18%;
+    --sidebar-accent-foreground: 210 30% 90%;
+    --sidebar-border: 215 35% 20%;
+    --sidebar-ring: 175 70% 50%;
+
+    /* Status badge specific */
+    --status-inside: 160 70% 38%;
+    --status-inside-bg: 160 60% 94%;
+    --status-outside: 215 20% 50%;
+    --status-outside-bg: 210 25% 93%;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 hsl(215 35% 15% / 0.05);
+    --shadow: 0 4px 6px -1px hsl(215 35% 15% / 0.08), 0 2px 4px -2px hsl(215 35% 15% / 0.05);
+    --shadow-md: 0 10px 15px -3px hsl(215 35% 15% / 0.1), 0 4px 6px -4px hsl(215 35% 15% / 0.05);
+    --shadow-lg: 0 20px 25px -5px hsl(215 35% 15% / 0.1), 0 8px 10px -6px hsl(215 35% 15% / 0.05);
+  }
+
+  .dark {
+    --background: 215 45% 8%;
+    --foreground: 210 30% 95%;
+
+    --card: 215 40% 12%;
+    --card-foreground: 210 30% 95%;
+
+    --popover: 215 40% 12%;
+    --popover-foreground: 210 30% 95%;
+
+    --primary: 210 80% 55%;
+    --primary-foreground: 215 45% 8%;
+    --primary-light: 210 75% 20%;
+    --primary-hover: 210 80% 60%;
+
+    --secondary: 215 35% 18%;
+    --secondary-foreground: 210 30% 90%;
+
+    --muted: 215 35% 18%;
+    --muted-foreground: 210 25% 60%;
+
+    --accent: 175 65% 45%;
+    --accent-foreground: 0 0% 100%;
+    --accent-light: 175 50% 20%;
+
+    --success: 160 65% 45%;
+    --success-foreground: 0 0% 100%;
+    --success-light: 160 50% 18%;
+
+    --warning: 38 85% 55%;
+    --warning-foreground: 0 0% 100%;
+    --warning-light: 38 60% 18%;
+
+    --destructive: 0 65% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --destructive-light: 0 50% 18%;
+
+    --border: 215 30% 22%;
+    --input: 215 30% 22%;
+    --ring: 210 80% 55%;
+
+    --status-inside: 160 65% 45%;
+    --status-inside-bg: 160 50% 18%;
+    --status-outside: 210 25% 60%;
+    --status-outside-bg: 215 35% 18%;
+
+    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.2);
+    --shadow: 0 4px 6px -1px hsl(0 0% 0% / 0.3), 0 2px 4px -2px hsl(0 0% 0% / 0.2);
+    --shadow-md: 0 10px 15px -3px hsl(0 0% 0% / 0.4), 0 4px 6px -4px hsl(0 0% 0% / 0.2);
+    --shadow-lg: 0 20px 25px -5px hsl(0 0% 0% / 0.4), 0 8px 10px -6px hsl(0 0% 0% / 0.2);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+    @apply font-semibold tracking-tight;
+  }
+}
+
+@layer components {
+  /* Status badges */
+  .status-inside {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium;
+    background-color: hsl(var(--status-inside-bg));
+    color: hsl(var(--status-inside));
+  }
+
+  .status-outside {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium;
+    background-color: hsl(var(--status-outside-bg));
+    color: hsl(var(--status-outside));
+  }
+
+  /* Card with shadow */
+  .card-elevated {
+    @apply bg-card rounded-lg border border-border;
+    box-shadow: var(--shadow);
+  }
+
+  .card-elevated-md {
+    @apply bg-card rounded-lg border border-border;
+    box-shadow: var(--shadow-md);
+  }
+
+  /* Marina header gradient */
+  .marina-header {
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(210 75% 45%) 100%);
+  }
+
+  /* Subtle grid pattern for backgrounds */
+  .bg-grid-pattern {
+    background-image: 
+      linear-gradient(to right, hsl(var(--border) / 0.3) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.3) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  /* Smooth transitions */
+  .transition-smooth {
+    @apply transition-all duration-200 ease-in-out;
+  }
+}
+
+@layer utilities {
+  /* Text gradients */
+  .text-gradient-primary {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--accent)) 100%);
+  }
+}

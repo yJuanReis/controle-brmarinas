@@ -1,0 +1,232 @@
+import { useState } from 'react';
+import { useMarina } from '@/contexts/MarinaContext';
+import { Header } from '@/components/Header';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { EditarPessoaModal } from '@/components/modals/EditarPessoaModal';
+import { CadastrarPessoaModal } from '@/components/modals/CadastrarPessoaModal';
+import { Pessoa } from '@/types/marina';
+import { UserTypeAvatar } from '@/lib/userTypeIcons';
+import {
+  Users,
+  Search,
+  Edit,
+  Phone,
+  FileText,
+  Car,
+  X,
+  UserPlus
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+const tiposUsuario = [
+  { value: 'all', label: 'Todos os tipos' },
+  { value: 'cliente', label: 'Cliente' },
+  { value: 'visita', label: 'Visita' },
+  { value: 'marinheiro', label: 'Marinheiro' },
+  { value: 'proprietario', label: 'Proprietário' },
+  { value: 'colaborador', label: 'Colaborador' },
+];
+
+export function PessoasPage() {
+  const { pessoas } = useMarina();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [tipoFiltro, setTipoFiltro] = useState('all');
+  const [editandoPessoa, setEditandoPessoa] = useState<Pessoa | null>(null);
+  const [showCadastrar, setShowCadastrar] = useState(false);
+  const [nomePreenchidoCadastro, setNomePreenchidoCadastro] = useState<string>('');
+
+  const pessoasFiltradas = pessoas.filter(p => 
+    (p.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.documento.includes(searchTerm) ||
+    p.placa?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    (tipoFiltro === 'all' || p.tipo === tipoFiltro)
+  );
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Header />
+
+      <main className="container mx-auto px-4 py-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <div>
+            <h2 className="text-2xl font-display font-bold text-foreground mb-1 flex items-center gap-2">
+              <Users className="h-6 w-6 text-primary" />
+              Pessoas Cadastradas
+            </h2>
+            <p className="text-muted-foreground">
+              {pessoasFiltradas.length} de {pessoas.length} pessoa{pessoas.length !== 1 ? 's' : ''}
+            </p>
+          </div>
+          <Button 
+            onClick={() => setShowCadastrar(true)}
+            size="lg"
+            className="gap-2 bg-orange-500 hover:bg-orange-600 px-6 py-4 text-base h-auto"
+          >
+            <UserPlus className="h-5 w-5" />
+            <div className="text-left">
+              <div className="font-semibold">Cadastrar Pessoa</div>
+              <div className="text-xs opacity-75">Adicionar nova pessoa</div>
+            </div>
+          </Button>
+        </div>
+
+        {/* Search and Filters */}
+        <div className="card-elevated p-5 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-medium flex items-center gap-2">
+              <Search className="h-4 w-4 text-muted-foreground" />
+              Filtrar pessoas
+            </h3>
+            {(searchTerm || tipoFiltro !== 'all') && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSearchTerm('');
+                  setTipoFiltro('all');
+                }}
+                className="text-muted-foreground gap-1.5"
+              >
+                <X className="h-4 w-4" />
+                Limpar filtros
+              </Button>
+            )}
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label className="text-xs flex items-center gap-1">
+                <Search className="h-3 w-3" />
+                Buscar pessoa
+              </Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Nome, documento ou placa..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs flex items-center gap-1">
+                <Users className="h-3 w-3" />
+                Tipo de pessoa
+              </Label>
+              <Select value={tipoFiltro} onValueChange={setTipoFiltro}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos os tipos" />
+                </SelectTrigger>
+                <SelectContent>
+                  {tiposUsuario.map((tipo) => (
+                    <SelectItem key={tipo.value} value={tipo.value}>
+                      {tipo.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        {pessoasFiltradas.length === 0 ? (
+          <div className="card-elevated p-12 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted mx-auto mb-4">
+              <Users className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <h4 className="font-medium text-foreground mb-1">Nenhuma pessoa encontrada</h4>
+            <p className="text-sm text-muted-foreground">
+              {searchTerm ? 'Tente ajustar os filtros de busca' : 'Cadastre uma pessoa para começar'}
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {pessoasFiltradas.map((pessoa) => (
+              <div 
+                key={pessoa.id}
+                className="card-elevated p-5 hover:shadow-lg transition-smooth"
+              >
+                <div className="flex items-start gap-4 mb-4">
+                  <UserTypeAvatar pessoa={pessoa} />
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-foreground truncate">
+                      {pessoa.nome}
+                    </h3>
+                    {pessoa.tipo && (
+                      <p className="text-xs font-medium text-primary mt-1">
+                        {pessoa.tipo.charAt(0).toUpperCase() + pessoa.tipo.slice(1)}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setEditandoPessoa(pessoa)}
+                    className="gap-1.5"
+                  >
+                    <Edit className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Editar</span>
+                  </Button>
+                </div>
+
+                <div className="space-y-2 border-t border-border pt-4">
+                  {/* Documento */}
+                  <div className="flex items-center gap-2 text-sm">
+                    <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <span className="text-muted-foreground">Documento:</span>
+                    <span className="font-mono text-foreground">{pessoa.documento}</span>
+                  </div>
+
+                  {/* Contato */}
+                  {pessoa.contato && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <span className="text-muted-foreground">Contato:</span>
+                      <span className="font-medium text-foreground">{pessoa.contato}</span>
+                    </div>
+                  )}
+
+                  {/* Placa */}
+                  {pessoa.placa && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Car className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <span className="text-muted-foreground">Placa:</span>
+                      <span className="font-mono bg-muted px-2 py-0.5 rounded text-xs font-medium text-foreground">
+                        {pessoa.placa}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </main>
+
+      {/* Modals */}
+      <CadastrarPessoaModal 
+        open={showCadastrar} 
+        onOpenChange={setShowCadastrar}
+        nomePreenchido={nomePreenchidoCadastro}
+      />
+      <EditarPessoaModal 
+        open={editandoPessoa !== null} 
+        onOpenChange={(open) => !open && setEditandoPessoa(null)}
+        pessoa={editandoPessoa}
+      />
+    </div>
+  );
+}

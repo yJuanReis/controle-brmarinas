@@ -1,6 +1,6 @@
-# Marina Porto Azul 🚢
+# Sistema de Controle de Acesso 🏢
 
-Um sistema profissional web para controle de entrada e saída de pessoas e veículos em marinas.
+Um sistema profissional web para controle de entrada e saída de pessoas e veículos em empresas e estabelecimentos.
 
 ## 🚀 Quick Start
 
@@ -39,8 +39,8 @@ npm run dev
 ```
 
 **Login Produção:**
-- Email: `juan.reis@brmarinas.com.br`
-- Senha: `j@9738gt`
+- Email: `admin@empresa.com`
+- Senha: `admin123`
 
 ---
 
@@ -50,7 +50,7 @@ Toda a documentação está em [`./docs`](./docs/):
 
 | Documento | Descrição | Tempo |
 |-----------|-----------|-------|
-| **[� COMECE_AQUI.md](./docs/COMECE_AQUI.md)** | Ponto de entrada - 5 passos | 5 min |
+| **[ COMECE_AQUI.md](./docs/COMECE_AQUI.md)** | Ponto de entrada - 5 passos | 5 min |
 | **[📖 INDEX.md](./docs/INDEX.md)** | Índice - Navegação | 5 min |
 | **[🎯 DOCUMENTACAO.md](./docs/DOCUMENTACAO.md)** | Guia completo do sistema | 15 min |
 | **[🛠️ DESENVOLVIMENTO.md](./docs/DESENVOLVIMENTO.md)** | Como desenvolver/estender | 20 min |
@@ -68,7 +68,7 @@ Toda a documentação está em [`./docs`](./docs/):
 - ✅ **Histórico** - Com 5 filtros avançados
 - ✅ **Multi-empresa** - Isolamento completo
 - ✅ **Responsivo** - Mobile, tablet, desktop
-- ✅ **Design System** - Tema nautico profissional
+- ✅ **Design System** - Interface profissional
 
 ---
 
@@ -152,4 +152,4 @@ npm run dev
 **Status**: ✅ Production Ready  
 **Última atualização**: Janeiro 2026
 
-Boa sorte! 🚢⚓
+Boa sorte! 🏢🔒

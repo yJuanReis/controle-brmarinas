@@ -148,6 +148,83 @@ npm run dev
 
 ---
 
+## 🎯 Principais Telas
+
+### Dashboard
+- Visão geral do sistema
+- Estatísticas de acesso
+- Alertas e notificações
+
+### Cadastro de Pessoas
+- Registro de novos usuários
+- Edição de informações
+- Histórico de acessos
+
+### Registro de Acesso
+- Entrada de pessoas/veículos
+- Saída de pessoas/veículos
+- Validação em tempo real
+
+### Histórico de Acessos
+- Filtros avançados
+- Exportação de relatórios
+- Busca inteligente
+
+### Administração
+- Gestão de usuários
+- Configurações do sistema
+- Controle de permissões
+
+---
+
+## 🔧 Configuração Avançada
+
+### Variáveis de Ambiente
+```env
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+VITE_APP_NAME="Sistema de Controle de Acesso"
+VITE_APP_VERSION="1.0.0"
+```
+
+### Build para Produção
+```bash
+npm run build
+npm run preview
+```
+
+### Deploy
+- **Vercel**: `vercel`
+- **Netlify**: `netlify deploy`
+- **Docker**: Imagem disponível no Docker Hub
+
+---
+
+## 🤝 Contribuição
+
+1. Faça um fork do projeto
+2. Crie uma branch para sua feature: `git checkout -b feature/nome-da-feature`
+3. Commit suas mudanças: `git commit -m 'Adiciona feature X'`
+4. Push para a branch: `git push origin feature/nome-da-feature`
+5. Abra um Pull Request
+
+---
+
+## 📄 Licença
+
+Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICENSE) para detalhes.
+
+---
+
+## 🙏 Agradecimentos
+
+- **React Community** - Pelo ecossistema incrível
+- **Supabase** - Por fornecer backend moderno
+- **Tailwind CSS** - Por simplificar o design
+- **Todos os contribuidores** - Por melhorar o projeto
+
+---
+
 **Versão**: 1.0.0  
 **Status**: ✅ Production Ready  
 **Última atualização**: Janeiro 2026

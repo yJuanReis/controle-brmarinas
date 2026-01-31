@@ -176,8 +176,8 @@ export function RegistrarEntradaModal({
           {/* LADO ESQUERDO: LISTA E BUSCA */}
           <div className="flex-1 flex flex-col border-r border-slate-200 bg-white min-w-0">
             {/* Search Bar */}
-            <div className="p-4 border-b border-slate-100">
-              <div className="relative">
+            <div className="p-4 border-b border-slate-100 flex gap-2">
+              <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <Input
                   placeholder="Buscar por nome, CPF ou placa..."
@@ -186,6 +186,20 @@ export function RegistrarEntradaModal({
                   className="h-11 text-base pl-10 bg-white border-slate-300 focus:bg-white transition-colors"
                 />
               </div>
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => {
+                  if (onAbrirCadastro) {
+                    onAbrirCadastro(searchTerm);
+                    onOpenChange(false);
+                  }
+                }}
+                className="h-11 gap-2 bg-orange-500 hover:bg-orange-600 text-white border-orange-600 hover:border-orange-700"
+              >
+                <UserPlus className="h-4 w-4" />
+                Cadastrar
+              </Button>
             </div>
 
             {/* List */}
@@ -194,19 +208,6 @@ export function RegistrarEntradaModal({
                 <div className="flex flex-col items-center justify-center h-full text-center p-6 text-slate-500">
                   <UserPlus className="h-10 w-10 mb-3 opacity-20" />
                   <p className="font-medium mb-4">Ninguém encontrado</p>
-
-                  {onAbrirCadastro && (
-                    <Button
-                      variant="link"
-                      onClick={() => {
-                        onAbrirCadastro(searchTerm);
-                        onOpenChange(false);
-                      }}
-                      className="gap-2 bg-orange-500 hover:bg-orange-600 px-6 py-6 text-base text-white"
-                    >
-                      Cadastrar nova pessoa?
-                    </Button>
-                  )}
                 </div>
               ) : (
                 filteredPessoas.map((pessoa) => {

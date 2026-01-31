@@ -35,11 +35,19 @@ export class AuditService {
     details: AuditDetails = {}
   ): Promise<void> {
     try {
-      const { user } = await supabase.auth.getUser();
+      console.log('🔍 AuditService.logAction - Iniciando registro de auditoria...');
+      
+      const { user, error: authError } = await supabase.auth.getUser();
+      console.log('👤 Usuário obtido:', user);
+      console.log('❌ Erro de auth:', authError);
+      
       const empresaId = localStorage.getItem('empresa_id');
+      console.log('🏢 Empresa ID:', empresaId);
 
       if (!user || !empresaId) {
-        console.warn('Não é possível registrar auditoria: usuário não autenticado ou empresa não definida');
+        console.warn('⚠️ Não é possível registrar auditoria: usuário não autenticado ou empresa não definida');
+        console.log('👤 User:', !!user);
+        console.log('🏢 Empresa ID:', !!empresaId);
         return;
       }
 
@@ -63,15 +71,19 @@ export class AuditService {
         }
       };
 
+      console.log('📝 Dados do log a ser inserido:', auditLog);
+
       const { error } = await supabase
         .from('audit_logs')
         .insert([auditLog]);
 
       if (error) {
-        console.error('Erro ao registrar auditoria:', error);
+        console.error('❌ Erro ao registrar auditoria:', error);
+      } else {
+        console.log('✅ Auditoria registrada com sucesso!');
       }
     } catch (error) {
-      console.error('Erro ao registrar auditoria:', error);
+      console.error('❌ Erro ao registrar auditoria:', error);
     }
   }
 

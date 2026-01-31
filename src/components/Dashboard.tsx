@@ -1,12 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMarina } from '@/contexts/MarinaContext';
 import { Header } from '@/components/Header';
 import { Button } from '@/components/ui/button';
+import { SaidaAutomaticaButton } from '@/components/ui/SaidaAutomaticaButton';
 import { EditarPessoaModal } from '@/components/modals/EditarPessoaModal';
 import { RegistrarEntradaModal } from '@/components/modals/RegistrarEntradaModal';
+import { CadastrarPessoaModal } from '@/components/modals/CadastrarPessoaModal';
 import { RegistrarSaidaHistoricoModal } from '@/components/modals/RegistrarSaidaHistoricoModal';
 import { RegistrarSaidaLoteModal } from '@/components/modals/RegistrarSaidaLoteModal';
 import { Pessoa } from '@/types/marina';
+import { marinaService } from '@/services/marinaService';
 import { UserTypeIcon, UserTypeAvatar } from '@/lib/userTypeIcons';
 import { 
   UserPlus, 
@@ -38,6 +41,36 @@ export function Dashboard() {
     pessoa: null,
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [confirmandoSaidaLote, setConfirmandoSaidaLote] = useState(false);
+
+  // Monitoramento automático de 8 horas
+  useEffect(() => {
+    if (!empresaAtual) return;
+
+    const verificarTempoPermanencia = async () => {
+      try {
+        console.log('⏰ Verificando tempo de permanência...');
+        
+        // Executar saída automática para quem ultrapassou 8 horas
+        const pessoasRemovidas = await marinaService.executarSaidaAutomatica(empresaAtual.id, 8);
+        
+        if (pessoasRemovidas > 0) {
+          console.log(`✅ ${pessoasRemovidas} pessoa(s) removida(s) automaticamente`);
+        }
+      } catch (error) {
+        console.error('❌ Erro ao verificar tempo de permanência:', error);
+      }
+    };
+
+    // Executar verificação a cada 1 hora (3600000ms)
+    const interval = setInterval(verificarTempoPermanencia, 3600000);
+
+    // Executar verificação imediatamente ao montar o componente
+    verificarTempoPermanencia();
+
+    // Limpar intervalo ao desmontar
+    return () => clearInterval(interval);
+  }, [empresaAtual]);
 
   const handleCadastrarERegistrar = (pessoaId: string) => {
     setPessoaPreSelecionada(pessoaId);
@@ -76,7 +109,9 @@ export function Dashboard() {
 
       <main className="container mx-auto px-4 py-6">
         {/* Action buttons */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8 justify-center">
+          
+          {/* Botao de Registrar Entrada */}          
           <Button 
             onClick={() => setShowEntrada(true)}
             size="lg"
@@ -85,21 +120,23 @@ export function Dashboard() {
             <LogIn className="h-5 w-5" />
             <div className="text-left">
               <div className="font-semibold">Registrar Entrada</div>
-              <div className="text-xs opacity-75">Marcar chegada</div>
             </div>
           </Button>
+
+          {/* Botao de Saída */}
           <Button 
             onClick={() => setShowSaidaLote(true)}
-            size="lg"
+            size="lg" 
             className="gap-2 bg-destructive hover:bg-destructive/90 px-6 py-4 text-base h-auto"
             disabled={pessoasDentro.length === 0}
           >
             <LogOut className="h-5 w-5" />
             <div className="text-left">
               <div className="font-semibold">Registrar Saída</div>
-              <div className="text-xs opacity-75">Marcar saída em lote</div>
             </div>
           </Button>
+
+          {/* Botao de Atualizar */}
           <Button
             onClick={handleRefresh}
             variant="outline"
@@ -110,7 +147,7 @@ export function Dashboard() {
             <RefreshCw className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
             <div className="text-left">
               <div className="font-semibold">{isRefreshing ? 'Atualizando...' : 'Atualizar'}</div>
-              <div className="text-xs opacity-75">Recarregar dados</div>
+
             </div>
           </Button>
         </div>
@@ -151,22 +188,22 @@ export function Dashboard() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border bg-muted/50">
-                    <th className="text-left py-3 px-5 text-xs font-medium text-black uppercase tracking-wider">
+                    <th className="text-center py-3 px-5 text-xs font-medium text-black uppercase tracking-wider">
                       Pessoa
                     </th>
-                    <th className="text-left py-3 px-5 text-xs font-medium text-black uppercase tracking-wider hidden sm:table-cell">
+                    <th className="text-center py-3 px-5 text-xs font-medium text-black uppercase tracking-wider hidden sm:table-cell">
                       Documento
                     </th>
-                    <th className="text-left py-3 px-5 text-xs font-medium text-black uppercase tracking-wider hidden lg:table-cell">
+                    <th className="text-center py-3 px-5 text-xs font-medium text-black uppercase tracking-wider hidden lg:table-cell">
                       Placa
                     </th>
-                    <th className="text-left py-3 px-5 text-xs font-medium text-black uppercase tracking-wider hidden md:table-cell">
+                    <th className="text-center py-3 px-5 text-xs font-medium text-black uppercase tracking-wider hidden md:table-cell">
                       Tipo
                     </th>
-                    <th className="text-left py-3 px-5 text-xs font-medium text-black uppercase tracking-wider">
+                    <th className="text-center py-3 px-5 text-xs font-medium text-black uppercase tracking-wider">
                       Entrada
                     </th>
-                    <th className="text-right py-3 px-5 text-xs font-medium text-black uppercase tracking-wider">
+                    <th className="text-center py-3 px-5 text-xs font-medium text-black uppercase tracking-wider">
                       Ação
                     </th>
                   </tr>
@@ -196,15 +233,15 @@ export function Dashboard() {
                           </div>
                         </div>
                       </td>
-                      <td className="py-4 px-5 hidden sm:table-cell">
-                        <div className="flex items-center gap-2 text-sm text-black">
+                      <td className="py-4 px-5 hidden sm:table-cell text-center">
+                        <div className="flex items-center justify-center gap-2 text-sm text-black">
                           <FileText className="h-3.5 w-3.5" />
                           {item.pessoa.documento}
                         </div>
                       </td>
-                      <td className="py-4 px-5 hidden lg:table-cell">
+                      <td className="py-4 px-5 hidden lg:table-cell text-center">
                         {item.pessoa.placa ? (
-                          <div className="flex items-center gap-2 text-sm">
+                          <div className="flex items-center justify-center gap-2 text-sm">
                             <Car className="h-3.5 w-3.5 text-black" />
                             <span className="font-mono bg-muted px-2 py-0.5 rounded text-xs">
                               {item.pessoa.placa}
@@ -214,7 +251,7 @@ export function Dashboard() {
                           <span className="text-sm text-black">—</span>
                         )}
                       </td>
-                      <td className="py-4 px-5 hidden md:table-cell">
+                      <td className="py-4 px-5 hidden md:table-cell text-center">
                         {item.pessoa.tipo ? (
                           <span className="text-xs font-medium bg-primary/10 text-primary px-2.5 py-1 rounded-full">
                             {item.pessoa.tipo === 'prestador' ? 'PS' : item.pessoa.tipo.charAt(0).toUpperCase() + item.pessoa.tipo.slice(1)}
@@ -223,8 +260,8 @@ export function Dashboard() {
                           <span className="text-sm text-black">—</span>
                         )}
                       </td>
-                      <td className="py-4 px-5">
-                        <div className="flex items-center gap-2">
+                      <td className="py-4 px-5 text-center">
+                        <div className="flex items-center justify-center gap-2">
                           <LogIn className="h-3.5 w-3.5 text-success" />
                           <div>
                             <p className="text-sm font-medium">{formatHora(item.entradaEm)}</p>
@@ -234,8 +271,8 @@ export function Dashboard() {
                           </div>
                         </div>
                       </td>
-                      <td className="py-4 px-5 text-right">
-                        <div className="flex justify-end gap-2">
+                      <td className="py-4 px-5 text-center">
+                        <div className="flex justify-center gap-2">
                           <Button
                             size="sm"
                             variant="outline"
@@ -252,7 +289,7 @@ export function Dashboard() {
                             className="gap-1.5 bg-destructive text-destructive-foreground"
                           >
                             <LogOut className="h-3.5 w-3.5" />
-                            <span className="hidden sm:inline">Saída</span>
+                              <span className="hidden sm:inline">Saída</span>
                           </Button>
                         </div>
                       </td>
@@ -277,9 +314,17 @@ export function Dashboard() {
         pessoaPreSelecionada={pessoaPreSelecionada}
         onPessoaPreSelecionadaUsada={() => setPessoaPreSelecionada(null)}
         onAbrirCadastro={(nomePreenchido) => {
+          console.log('🚀 onAbrirCadastro chamado com:', nomePreenchido);
           setNomePreenchidoCadastro(nomePreenchido);
           setShowCadastrar(true);
+          setShowEntrada(false); // Fechar o modal de entrada
         }}
+      />
+      <CadastrarPessoaModal 
+        open={showCadastrar} 
+        onOpenChange={setShowCadastrar}
+        nomePreenchido={nomePreenchidoCadastro}
+        onCadastrarERegistrar={handleCadastrarERegistrar}
       />
       <RegistrarSaidaHistoricoModal
         open={saidaModal.open}

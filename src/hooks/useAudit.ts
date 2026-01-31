@@ -49,15 +49,20 @@ export function useAudit(): UseAuditReturn {
     setLoading(true);
     setError(null);
     
+    console.log('🔍 useAudit.fetchLogs - Iniciando busca de logs...');
+    console.log('🔍 useAudit.fetchLogs - Filtros:', filter);
+    console.log('🔍 useAudit.fetchLogs - Página:', page);
+    
     try {
       const result = await auditService.getAuditLogsPaginated(page, 20, filter);
+      console.log('🔍 useAudit.fetchLogs - Resultado:', result);
       setLogs(result.data);
       setCurrentPage(page);
       setTotalPages(result.totalPages);
       setTotalLogs(result.total);
     } catch (err) {
       setError('Erro ao buscar logs de auditoria');
-      console.error('Erro ao buscar logs de auditoria:', err);
+      console.error('❌ useAudit.fetchLogs - Erro ao buscar logs de auditoria:', err);
     } finally {
       setLoading(false);
     }

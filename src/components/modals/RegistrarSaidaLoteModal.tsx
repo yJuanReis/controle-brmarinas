@@ -27,14 +27,26 @@ export function RegistrarSaidaLoteModal({ open, onOpenChange, pessoasDentro }: R
   const [confirmandoSaida, setConfirmandoSaida] = useState<PessoaDentro | null>(null);
   const [horarioSaida, setHorarioSaida] = useState<string>('');
   const [observacaoConfirm, setObservacaoConfirm] = useState<string>('');
+  const [confirmandoSaidaLote, setConfirmandoSaidaLote] = useState(false);
 
   const handleRegistrarSaida = async (movimentacaoId: string) => {
-    const result = await registrarSaida(movimentacaoId);
-    if (result.success) {
-      setSaidaRegistrada(prev => new Set(prev).add(movimentacaoId));
-      setConfirmandoSaida(null);
-      setHorarioSaida('');
-      setObservacaoConfirm('');
+    try {
+      console.log('🚀 Registrando saída para movimentação:', movimentacaoId);
+      
+      const result = await registrarSaida(movimentacaoId);
+      console.log('✅ Resultado da saída:', result);
+      
+      if (result.success) {
+        setSaidaRegistrada(prev => new Set(prev).add(movimentacaoId));
+        setConfirmandoSaida(null);
+        setHorarioSaida('');
+        setObservacaoConfirm('');
+        console.log('✅ Saída registrada com sucesso');
+      } else {
+        console.error('❌ Falha ao registrar saída:', result.error);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao registrar saída:', error);
     }
   };
 
@@ -238,6 +250,17 @@ export function RegistrarSaidaLoteModal({ open, onOpenChange, pessoasDentro }: R
           </Button>
           <Button
             type="button"
+            variant="destructive"
+            size="lg"
+            onClick={() => setConfirmandoSaidaLote(true)}
+            disabled={pessoasDentro.length === 0}
+            className="gap-2"
+          >
+            <LogOut className="h-4 w-4" />
+            Registrar saida de todas as {pessoasDentro.length} pessoa{pessoasDentro.length > 1 ? 's' : ''}
+          </Button>
+          <Button
+            type="button"
             variant="default"
             onClick={() => {
               handleClose();
@@ -251,7 +274,7 @@ export function RegistrarSaidaLoteModal({ open, onOpenChange, pessoasDentro }: R
         </DialogFooter>
       </DialogContent>
 
-      {/* Confirmation Modal */}
+      {/* Confirmation Modal Individual */}
       <Dialog open={!!confirmandoSaida} onOpenChange={(isOpen) => {
         if (!isOpen) {
           setConfirmandoSaida(null);
@@ -358,6 +381,79 @@ export function RegistrarSaidaLoteModal({ open, onOpenChange, pessoasDentro }: R
             >
               <LogOut className="h-4 w-4 mr-2" />
               Confirmar Saída
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmation Modal Lote */}
+      <Dialog open={confirmandoSaidaLote} onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          setConfirmandoSaidaLote(false);
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 font-display">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-destructive-light">
+                <LogOut className="h-4 w-4 text-destructive" />
+              </div>
+              Saída em Lote
+            </DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja registrar saída para todas as {pessoasDentro.length} pessoa{pessoasDentro.length > 1 ? 's' : ''} dentro da marina?
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="p-4 rounded-lg bg-muted">
+              <p className="text-sm text-muted-foreground mb-2">Esta ação:</p>
+              <ul className="text-sm space-y-1">
+                <li>• Registrar saída para todas as pessoas dentro da marina</li>
+                <li>• Usará o horário atual como horário de saída</li>
+                <li>• Não será possível desfazer</li>
+              </ul>
+            </div>
+
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Clock className="h-4 w-4" />
+              <span>Horário de saída: {format(new Date(), "HH:mm", { locale: ptBR })}</span>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => setConfirmandoSaidaLote(false)}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              onClick={async () => {
+                try {
+                  console.log('🚀 Iniciando saída em lote para', pessoasDentro.length, 'pessoas');
+                  
+                  // Registrar saída para todas as pessoas
+                  for (const pessoa of pessoasDentro) {
+                    console.log('🔄 Registrando saída para pessoa:', pessoa.pessoa.nome);
+                    await handleRegistrarSaida(pessoa.movimentacaoId);
+                  }
+                  
+                  console.log('✅ Saída em lote concluída');
+                  
+                  // Fechar modais
+                  setConfirmandoSaidaLote(false);
+                  handleClose();
+                } catch (error) {
+                  console.error('❌ Erro ao registrar saída em lote:', error);
+                }
+              }} 
+              variant="destructive" 
+              className="px-6"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Confirmar Saída em Lote
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -114,6 +114,14 @@ export function CadastrarPessoaModal({ open, onOpenChange, onCadastrarERegistrar
   useEffect(() => {
     if (open && nomePreenchido && nomePreenchido.trim()) {
       setFormData(prev => ({ ...prev, nome: nomePreenchido }));
+      
+      // Focar no campo de documento após o modal abrir
+      setTimeout(() => {
+        const documentoElement = document.getElementById('documento');
+        if (documentoElement) {
+          documentoElement.focus();
+        }
+      }, 100);
     }
   }, [open, nomePreenchido]);
 

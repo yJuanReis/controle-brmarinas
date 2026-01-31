@@ -22,6 +22,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AuditAction, AuditEntityType, AuditLog } from '@/types/audit';
 import { useToast } from '@/hooks/use-toast';
+import { DebugAudit } from '@/components/DebugAudit';
 
 const auditActions = [
   { value: 'CREATE', label: 'Criar' },
@@ -46,6 +47,14 @@ const entityTypes = [
 
 export function AuditLogsPage() {
   const { user } = useMarina();
+  
+  // Debug: Verificar o user e o perfil
+  console.log('🔍 AuditLogsPage - user completo:', user);
+  console.log('🔍 AuditLogsPage - user?.profile:', user?.profile);
+  console.log('🔍 AuditLogsPage - user?.profile?.role:', user?.profile?.role);
+  console.log('🔍 AuditLogsPage - user?.profile?.role === "admin":', user?.profile?.role === 'admin');
+  console.log('🔍 AuditLogsPage - user?.profile?.role === "owner":', user?.profile?.role === 'owner');
+  
   const { 
     logs, 
     summary, 
@@ -350,6 +359,9 @@ export function AuditLogsPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* Debug */}
+        <DebugAudit />
 
         {/* Erro */}
         {error && (

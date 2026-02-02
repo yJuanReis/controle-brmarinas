@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { useMarina } from '@/contexts/MarinaContext';
 import { FileText, Phone, Car, Users, Gift, Anchor, Briefcase } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { validateCPF, validateRG, validatePlaca, formatName, formatPhone, formatPlaca } from '@/lib/validation';
 
 interface CadastrarPessoaModalProps {
   open: boolean;
@@ -28,7 +29,20 @@ export function CadastrarPessoaModal({ open, onOpenChange, onCadastrarERegistrar
   const [lastPessoaCadastrada, setLastPessoaCadastrada] = useState<{ id: string; nome: string } | null>(null);
 
   const handleChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    let processedValue = value;
+    
+    // Processamento específico para cada campo
+    if (field === 'documento') {
+      // Manter o valor bruto para validação, mas permitir formatação visual
+      processedValue = value;
+    } else if (field === 'contato') {
+      processedValue = value.replace(/\D/g, '');
+    } else if (field === 'placa') {
+      processedValue = value.toUpperCase();
+    }
+    // Removido o processamento do campo de nome para permitir digitação normal
+    
+    setFormData(prev => ({ ...prev, [field]: processedValue }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
@@ -42,13 +56,30 @@ export function CadastrarPessoaModal({ open, onOpenChange, onCadastrarERegistrar
     if (!formData.documento.trim()) {
       newErrors.documento = 'Documento é obrigatório';
     } else {
+      // Validar formato do documento (CPF ou RG)
+      const documentoValue = formData.documento.trim();
+      const cpfValidation = validateCPF(documentoValue);
+      const rgValidation = validateRG(documentoValue);
+      
+      // Se não for um CPF válido e não for um RG válido, marcar como erro
+      if (!cpfValidation.isValid && !rgValidation.isValid) {
+        newErrors.documento = 'Documento inválido. Por favor, insira um CPF ou RG válido.';
+      }
+      
       // Verificar se pessoa com este documento já existe na empresa atual
       const empresaAtual = user?.empresa_id;
       const pessoaExistente = pessoas.find(
-        p => p.documento === formData.documento.trim() && p.empresa_id === empresaAtual
+        p => p.documento === documentoValue && p.empresa_id === empresaAtual
       );
       if (pessoaExistente) {
-        newErrors.documento = `Pessoa com documento ${formData.documento} já existe nesta empresa`;
+        newErrors.documento = `Pessoa com documento ${documentoValue} já existe nesta empresa`;
+      }
+    }
+    if (formData.placa.trim()) {
+      // Validar formato da placa
+      const placaValidation = validatePlaca(formData.placa.trim());
+      if (!placaValidation.isValid) {
+        newErrors.placa = 'Placa inválida. Por favor, insira uma placa no formato ABC-1234 ou ABC-1D23.';
       }
     }
     setErrors(newErrors);
@@ -206,9 +237,9 @@ export function CadastrarPessoaModal({ open, onOpenChange, onCadastrarERegistrar
                   handleChange('documento', cleanValue);
                 }}
                 onKeyDown={(e) => {
-                  // Bloquear completamente caracteres especiais (incluindo vírgula)
-                  const allowedKeys = /^[a-zA-Z0-9\s]$/;
-                  const controlKeys = ['Backspace', 'Delete', 'Tab', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'];
+                  // Permitir teclas de controle e caracteres alfanuméricos e espaços
+                  const controlKeys = ['Backspace', 'Delete', 'Tab', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', ' '];
+                  const allowedKeys = /^[a-zA-Z0-9]$/;
 
                   if (!controlKeys.includes(e.key) && !allowedKeys.test(e.key)) {
                     e.preventDefault();
@@ -274,11 +305,56 @@ export function CadastrarPessoaModal({ open, onOpenChange, onCadastrarERegistrar
               </Label>
               <Input
                 id="placa"
-                placeholder="ABC-1234"
+                placeholder="ABC1234 ou ABC1D23"
                 value={formData.placa}
-                onChange={(e) => handleChange('placa', e.target.value.toUpperCase())}
-                className="h-11 font-mono"
+                onChange={(e) => {
+                  let value = e.target.value.toUpperCase();
+                  
+                  // Se o valor atual tem hífen e o usuário está apagando, permitir a remoção
+                  if (value.includes('-')) {
+                    const beforeValue = formData.placa;
+                    const currentValue = value;
+                    
+                    // Verificar se o usuário está apagando (comprimento diminuiu)
+                    if (currentValue.length < beforeValue.length) {
+                      // Se está apagando o hífen, remover o hífen e continuar
+                      if (currentValue.includes('-')) {
+                        value = value.replace('-', '');
+                      } else {
+                        // Se o hífen foi removido, manter sem hífen
+                        value = value.replace(/[^a-zA-Z0-9]/g, '');
+                      }
+                    } else {
+                      // Se está digitando, remover caracteres inválidos e inserir hífen
+                      value = value.replace(/[^a-zA-Z0-9-]/g, '');
+                      if (value.length >= 4 && !value.includes('-')) {
+                        value = value.substring(0, 3) + '-' + value.substring(3);
+                      }
+                    }
+                  } else {
+                    // Sem hífen: permitir apenas letras e números
+                    value = value.replace(/[^a-zA-Z0-9]/g, '');
+                    // Inserir hífen após 3 caracteres
+                    if (value.length >= 3) {
+                      value = value.substring(0, 3) + '-' + value.substring(3);
+                    }
+                  }
+                  
+                  handleChange('placa', value);
+                }}
+                onKeyDown={(e) => {
+                  // Permitir teclas de controle
+                  const controlKeys = ['Backspace', 'Delete', 'Tab', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'];
+                  
+                  if (!controlKeys.includes(e.key) && !/^[a-zA-Z0-9]$/.test(e.key)) {
+                    e.preventDefault();
+                  }
+                }}
+                className={cn("h-11 font-mono", errors.placa ? 'border-destructive' : '')}
               />
+              {errors.placa && (
+                <p className="text-xs text-destructive">{errors.placa}</p>
+              )}
             </div>
 
             <DialogFooter className="gap-2 sm:gap-0">

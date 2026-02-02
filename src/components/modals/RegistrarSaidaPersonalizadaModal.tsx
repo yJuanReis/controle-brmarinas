@@ -10,13 +10,13 @@ import { PessoaDentro } from '@/types/marina';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-interface RegistrarSaidaHistoricoModalProps {
+interface RegistrarSaidaPersonalizadaModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   pessoaDentro: PessoaDentro | null;
 }
 
-export function RegistrarSaidaHistoricoModal({ open, onOpenChange, pessoaDentro }: RegistrarSaidaHistoricoModalProps) {
+export function RegistrarSaidaPersonalizadaModal({ open, onOpenChange, pessoaDentro }: RegistrarSaidaPersonalizadaModalProps) {
   const { registrarSaida } = useMarina();
   const [saidaEm, setSaidaEm] = useState('');
   const [observacao, setObservacao] = useState('');
@@ -134,15 +134,21 @@ export function RegistrarSaidaHistoricoModal({ open, onOpenChange, pessoaDentro 
           <div className="space-y-2">
             <Label className="text-sm flex items-center gap-2">
               <FileText className="h-4 w-4" />
-              Observação (opcional)
+              Observação de Saída <span className="text-red-600 font-bold">*</span>
             </Label>
             <Textarea
-              placeholder="Adicione uma observação sobre a saída..."
+              placeholder="Ex: Saída para entrega, finalização de serviço..."
               value={observacao}
               onChange={(e) => setObservacao(e.target.value)}
               rows={3}
               className="resize-none"
+              required
             />
+            {observacao.trim() === '' && (
+              <p className="text-red-600 text-sm font-medium">
+                ⚠️ A observação é obrigatória para registrar a saída
+              </p>
+            )}
           </div>
         </div>
 

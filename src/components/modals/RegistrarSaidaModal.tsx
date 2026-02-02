@@ -93,6 +93,28 @@ export function RegistrarSaidaModal({ open, onOpenChange, pessoaDentro }: Regist
           </div>
         </div>
 
+        <div className="space-y-4">
+          {/* Observation */}
+          <div className="space-y-2">
+            <label className="font-medium text-sm flex items-center gap-2">
+              <MessageSquare className="h-4 w-4" />
+              Observação de Saída <span className="text-red-600 font-bold">*</span>
+            </label>
+            <Textarea
+              placeholder="Ex: Saída para entrega, finalização de serviço..."
+              value={observacaoConfirm}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setObservacaoConfirm(e.target.value)}
+              rows={3}
+              required
+            />
+            {observacaoConfirm.trim() === '' && (
+              <p className="text-red-600 text-sm font-medium">
+                ⚠️ A observação é obrigatória para registrar a saída
+              </p>
+            )}
+          </div>
+        </div>
+
         <DialogFooter className="gap-2 sm:gap-0">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
             Cancelar

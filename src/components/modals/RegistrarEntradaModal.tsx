@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UserTypeAvatar } from '@/lib/userTypeIcons';
+import { validateCPF, validateRG, validatePlaca } from '@/lib/validation';
+import { smartSearch } from '@/lib/utils';
 
 type TipoPessoa = 'cliente' | 'visita' | 'marinheiro' | 'proprietario' | 'colaborador' | 'prestador' | '';
 
@@ -54,11 +56,10 @@ export function RegistrarEntradaModal({
   // Filtragem
   const filteredPessoas = useMemo(() => {
     if (!searchTerm.trim()) return pessoas;
-    const term = searchTerm.toLowerCase();
     return pessoas.filter(p => 
-      p.nome.toLowerCase().includes(term) || 
-      p.documento.includes(term) ||
-      p.placa?.toLowerCase().includes(term)
+      smartSearch(p.nome, searchTerm) || 
+      smartSearch(p.documento, searchTerm) ||
+      smartSearch(p.placa || '', searchTerm)
     );
   }, [pessoas, searchTerm]);
 
@@ -88,18 +89,14 @@ export function RegistrarEntradaModal({
     if (pessoa) {
       carregarDadosEdicao(pessoa);
       setIsEditing(false);
+      // Focus on observação field after a small delay to ensure the form is rendered
+      setTimeout(() => {
+        const observacaoElement = document.getElementById('observacao-input');
+        if (observacaoElement) {
+          observacaoElement.focus();
+        }
+      }, 100);
     }
-  };
-
-  const handleDoubleClickPessoa = (pessoaId: string) => {
-    handleSelectPessoa(pessoaId);
-    // Focus on observação field after a small delay to ensure the form is rendered
-    setTimeout(() => {
-      const observacaoElement = document.getElementById('observacao-input');
-      if (observacaoElement) {
-        observacaoElement.focus();
-      }
-    }, 100);
   };
 
   const handleEditDirectlyFromList = (e: React.MouseEvent, pessoaId: string) => {
@@ -217,8 +214,7 @@ export function RegistrarEntradaModal({
                   return (
                     <div
                       key={pessoa.id}
-                      onClick={() => handleSelectPessoa(pessoa.id)}
-                      onDoubleClick={() => handleDoubleClickPessoa(pessoa.id)}
+onClick={() => handleSelectPessoa(pessoa.id)}
                       className={cn(
                         "group w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all duration-200 border border-transparent",
                         isSelected
@@ -239,7 +235,7 @@ export function RegistrarEntradaModal({
                           {/* Badges de Status */}
                           <div className="flex items-center gap-2">
                             {!check.pode && (
-                              <span className="flex items-center gap-1 text-[10px] uppercase font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100">
+                              <span className="flex items-center gap-1 text-[11px] uppercase font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100">
                                 Na Marina
                               </span>
                             )}
@@ -286,6 +282,7 @@ export function RegistrarEntradaModal({
                     <div className="space-y-2">
 
                       <div className="grid gap-3">
+                        <Label className="text-[11px] text-black">Nome</Label>
                         <Input
                           value={editData.nome}
                           disabled={!isEditing}
@@ -298,20 +295,38 @@ export function RegistrarEntradaModal({
                         />
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1">
-                            <Label className="text-[10px] text-black">Documento</Label>
+                            <Label className="text-[11px] text-black">Documento</Label>
                             <Input
                               value={editData.documento}
                               disabled={!isEditing}
-                              onChange={(e) => setEditData({ ...editData, documento: e.target.value })}
+                              onChange={(e) => {
+                                if (isEditing) {
+                                  // Permitir apenas letras, números e espaços
+                                  const cleanValue = e.target.value.replace(/[^a-zA-Z0-9\s]/g, '');
+                                  setEditData({ ...editData, documento: cleanValue });
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                if (isEditing) {
+                                  // Permitir teclas de controle e caracteres alfanuméricos e espaços
+                                  const controlKeys = ['Backspace', 'Delete', 'Tab', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', ' '];
+                                  const allowedKeys = /^[a-zA-Z0-9]$/;
+
+                                  if (!controlKeys.includes(e.key) && !allowedKeys.test(e.key)) {
+                                    e.preventDefault();
+                                  }
+                                }
+                              }}
                               className={cn(
                                 "bg-white",
                                 !isEditing && "bg-slate-50 border-slate-300 text-black"
                               )}
+                              maxLength={20}
                             />
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-[10px] text-black">Tipo</Label>
-                            {isEditing ? (
+                            <Label className="text-[11px] text-black">Tipo</Label>
+{isEditing ? (
                               <select
                                 value={editData.tipo}
                                 onChange={(e) => {
@@ -319,7 +334,7 @@ export function RegistrarEntradaModal({
                                     setEditData({ ...editData, tipo: e.target.value });
                                   }
                                 }}
-                                className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                               >
                                 <option value="">Selecione...</option>
                                 <option value="cliente">Cliente</option>
@@ -332,7 +347,7 @@ export function RegistrarEntradaModal({
                             ) : (
                               <div className={cn(
                                 "flex h-10 w-full items-center rounded-md border border-slate-300 px-3 text-sm",
-                                !isEditing && "bg-slate-50 text-black"
+                                !isEditing && "bg-slate-50 border-slate-300 text-slate-500"
                               )}>
                                 {editData.tipo || '—'}
                               </div>
@@ -343,49 +358,99 @@ export function RegistrarEntradaModal({
                     </div>
 
                     <div className="space-y-2 pt-2">
-                      <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                        Contato e Veículo
-                      </Label>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Phone className="h-3 w-3 text-black" />
-                            <Label className="text-xs text-black">Telefone</Label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Phone className="h-3 w-3 text-black" />
+                              <Label className="text-xs text-black">Telefone</Label>
+                            </div>
+                            <Input
+                              value={editData.contato}
+                              disabled={!isEditing}
+                              onChange={(e) => {
+                                if (isEditing) {
+                                  // Filtrar apenas números
+                                  const numericValue = e.target.value.replace(/\D/g, '');
+                                  setEditData({ ...editData, contato: numericValue });
+                                }
+                              }}
+                              className={cn(
+                                "bg-white",
+                                !isEditing && "bg-slate-50 border-slate-300 text-black"
+                              )}
+                              placeholder="Nenhum registro"
+                              maxLength={15}
+                            />
                           </div>
-                          <Input
-                            value={editData.contato}
-                            disabled={!isEditing}
-                            onChange={(e) => setEditData({ ...editData, contato: e.target.value })}
-                            className={cn(
-                              "bg-white",
-                              !isEditing && "bg-slate-50 border-slate-300 text-black"
-                            )}
-                            placeholder="Nenhum registro"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Car className="h-3 w-3 text-black" />
-                            <Label className="text-xs text-black">Placa</Label>
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Car className="h-3 w-3 text-black" />
+                              <Label className="text-xs text-black">Placa</Label>
+                            </div>
+                            <Input
+                              value={editData.placa}
+                              disabled={!isEditing}
+                              onChange={(e) => {
+                                if (isEditing) {
+                                  let value = e.target.value.toUpperCase();
+                                  
+                                  // Se o valor atual tem hífen e o usuário está apagando, permitir a remoção
+                                  if (value.includes('-')) {
+                                    const beforeValue = editData.placa;
+                                    const currentValue = value;
+                                    
+                                    // Verificar se o usuário está apagando (comprimento diminuiu)
+                                    if (currentValue.length < beforeValue.length) {
+                                      // Se está apagando o hífen, remover o hífen e continuar
+                                      if (currentValue.includes('-')) {
+                                        value = value.replace('-', '');
+                                      } else {
+                                        // Se o hífen foi removido, manter sem hífen
+                                        value = value.replace(/[^a-zA-Z0-9]/g, '');
+                                      }
+                                    } else {
+                                      // Se está digitando, remover caracteres inválidos e inserir hífen
+                                      value = value.replace(/[^a-zA-Z0-9-]/g, '');
+                                      if (value.length >= 4 && !value.includes('-')) {
+                                        value = value.substring(0, 3) + '-' + value.substring(3);
+                                      }
+                                    }
+                                  } else {
+                                    // Sem hífen: permitir apenas letras e números
+                                    value = value.replace(/[^a-zA-Z0-9]/g, '');
+                                    // Inserir hífen após 3 caracteres
+                                    if (value.length >= 3) {
+                                      value = value.substring(0, 3) + '-' + value.substring(3);
+                                    }
+                                  }
+                                  
+                                  setEditData({ ...editData, placa: value });
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                if (isEditing) {
+                                  // Permitir teclas de controle
+                                  const controlKeys = ['Backspace', 'Delete', 'Tab', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'];
+                                  
+                                  if (!controlKeys.includes(e.key) && !/^[a-zA-Z0-9]$/.test(e.key)) {
+                                    e.preventDefault();
+                                  }
+                                }
+                              }}
+                              className={cn(
+                                "bg-white font-mono",
+                                !isEditing && "bg-slate-50 border-slate-300 text-black"
+                              )}
+                              placeholder="---"
+                            />
                           </div>
-                          <Input
-                            value={editData.placa}
-                            disabled={!isEditing}
-                            onChange={(e) => setEditData({ ...editData, placa: e.target.value.toUpperCase() })}
-                            className={cn(
-                              "bg-white font-mono",
-                              !isEditing && "bg-slate-50 border-slate-300 text-black"
-                            )}
-                            placeholder="---"
-                          />
                         </div>
-                      </div>
                     </div>
 
                     <div className="space-y-2 pt-4 border-t border-slate-300">
                       <Label className="flex items-center gap-2 text-sm font-medium text-black">
                         <FileText className="h-4 w-4 text-primary" />
-                        Observação de Entrada
+                        Observação de Entrada 
                       </Label>
                       <Textarea
                         id="observacao-input"
@@ -395,6 +460,7 @@ export function RegistrarEntradaModal({
                         className="resize-none min-h-[100px] bg-white border-slate-300 focus:border-primary"
                         required
                       />
+                      
                     </div>
                   </div>
 

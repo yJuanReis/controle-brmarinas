@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useMarina } from '@/contexts/MarinaContext';
 import { Header } from '@/components/Header';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import { EditarPessoaModal } from '@/components/modals/EditarPessoaModal';
 import { CadastrarPessoaModal } from '@/components/modals/CadastrarPessoaModal';
 import { Pessoa } from '@/types/marina';
 import { UserTypeAvatar } from '@/lib/userTypeIcons';
+import { smartSearch } from '@/lib/utils';
 import {
   Users,
   Search,
@@ -23,7 +24,8 @@ import {
   FileText,
   Car,
   X,
-  UserPlus
+  UserPlus,
+  ArrowUp
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -43,13 +45,30 @@ export function PessoasPage() {
   const [editandoPessoa, setEditandoPessoa] = useState<Pessoa | null>(null);
   const [showCadastrar, setShowCadastrar] = useState(false);
   const [nomePreenchidoCadastro, setNomePreenchidoCadastro] = useState<string>('');
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
-  const pessoasFiltradas = pessoas.filter(p => 
-    (p.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.documento.includes(searchTerm) ||
-    p.placa?.toLowerCase().includes(searchTerm.toLowerCase())) &&
-    (tipoFiltro === 'all' || p.tipo === tipoFiltro)
-  );
+  // Efeito para controlar visibilidade do botão flutuante
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      setShowScrollTop(scrollTop > 300);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const pessoasFiltradas = useMemo(() => {
+    const filteredBySearch = pessoas.filter(p => 
+      smartSearch(p.nome, searchTerm) ||
+      smartSearch(p.documento, searchTerm) ||
+      smartSearch(p.placa || '', searchTerm)
+    );
+    
+    return filteredBySearch.filter(p => 
+      tipoFiltro === 'all' || p.tipo === tipoFiltro
+    );
+  }, [pessoas, searchTerm, tipoFiltro]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -209,6 +228,14 @@ export function PessoasPage() {
                       </span>
                     </div>
                   )}
+
+                  {/* Observação obrigatória */}
+                  <div className="flex items-start gap-2">
+                    <FileText className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm text-red-600 font-medium">
+                      ⚠️ Observação obrigatória para registro de entrada/saída
+                    </p>
+                  </div>
                 </div>
               </div>
             ))}
@@ -227,6 +254,20 @@ export function PessoasPage() {
         onOpenChange={(open) => !open && setEditandoPessoa(null)}
         pessoa={editandoPessoa}
       />
+
+      {/* Botão flutuante para rolar até o topo */}
+      <Button
+        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        className={`fixed bottom-6 right-6 w-12 h-12 rounded-full shadow-lg transition-all duration-300 ease-in-out ${
+          showScrollTop 
+            ? 'opacity-100 translate-y-0' 
+            : 'opacity-0 translate-y-10 pointer-events-none'
+        }`}
+        variant="default"
+        size="icon"
+      >
+        <ArrowUp className="h-6 w-6" />
+      </Button>
     </div>
   );
 }

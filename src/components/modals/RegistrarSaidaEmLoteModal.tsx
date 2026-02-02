@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -11,13 +11,13 @@ import { LogOut, Check, MessageSquare, Search, X, History, User, Phone, Car, Clo
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-interface RegistrarSaidaLoteModalProps {
+interface RegistrarSaidaEmLoteModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   pessoasDentro: PessoaDentro[];
 }
 
-export function RegistrarSaidaLoteModal({ open, onOpenChange, pessoasDentro }: RegistrarSaidaLoteModalProps) {
+export function RegistrarSaidaEmLoteModal({ open, onOpenChange, pessoasDentro }: RegistrarSaidaEmLoteModalProps) {
   const { registrarSaida } = useMarina();
   const navigate = useNavigate();
   const [saidaRegistrada, setSaidaRegistrada] = useState<Set<string>>(new Set());
@@ -28,6 +28,26 @@ export function RegistrarSaidaLoteModal({ open, onOpenChange, pessoasDentro }: R
   const [horarioSaida, setHorarioSaida] = useState<string>('');
   const [observacaoConfirm, setObservacaoConfirm] = useState<string>('');
   const [confirmandoSaidaLote, setConfirmandoSaidaLote] = useState(false);
+  const [confirmacaoTexto, setConfirmacaoTexto] = useState('');
+  const [timerConcluido, setTimerConcluido] = useState(false);
+  const [tempoRestante, setTempoRestante] = useState(3);
+
+  // Timer de segurança
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (confirmandoSaidaLote && !timerConcluido) {
+      interval = setInterval(() => {
+        setTempoRestante(prev => {
+          if (prev <= 1) {
+            setTimerConcluido(true);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [confirmandoSaidaLote, timerConcluido]);
 
   const handleRegistrarSaida = async (movimentacaoId: string) => {
     try {
@@ -108,7 +128,7 @@ export function RegistrarSaidaLoteModal({ open, onOpenChange, pessoasDentro }: R
               <Input
                 placeholder="Buscar por nome, documento ou placa..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
             </div>
@@ -227,15 +247,21 @@ export function RegistrarSaidaLoteModal({ open, onOpenChange, pessoasDentro }: R
                   {mostraObs && (
                     <div className="mt-3 pt-3 border-t border-border">
                       <Textarea
-                        placeholder="Adicione uma observação sobre a saída..."
+                        placeholder="Ex: Saída para entrega, finalização de serviço..."
                         value={observacoes[item.movimentacaoId] || ''}
-                        onChange={(e) => setObservacoes(prev => ({
+                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setObservacoes(prev => ({
                           ...prev,
                           [item.movimentacaoId]: e.target.value
                         }))}
                         className="text-sm"
                         rows={2}
+                        required
                       />
+                      {observacoes[item.movimentacaoId]?.trim() === '' && (
+                        <p className="text-red-600 text-xs font-medium mt-1">
+                          ⚠️ Observação obrigatória
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -275,7 +301,7 @@ export function RegistrarSaidaLoteModal({ open, onOpenChange, pessoasDentro }: R
       </DialogContent>
 
       {/* Confirmation Modal Individual */}
-      <Dialog open={!!confirmandoSaida} onOpenChange={(isOpen) => {
+      <Dialog open={!!confirmandoSaida} onOpenChange={(isOpen: boolean) => {
         if (!isOpen) {
           setConfirmandoSaida(null);
           setHorarioSaida('');
@@ -338,7 +364,7 @@ export function RegistrarSaidaLoteModal({ open, onOpenChange, pessoasDentro }: R
                 <Input
                   type="datetime-local"
                   value={horarioSaida}
-                  onChange={(e) => setHorarioSaida(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setHorarioSaida(e.target.value)}
                 />
               </div>
 
@@ -351,7 +377,7 @@ export function RegistrarSaidaLoteModal({ open, onOpenChange, pessoasDentro }: R
                 <Textarea
                   placeholder="Adicione uma observação sobre a saída..."
                   value={observacaoConfirm}
-                  onChange={(e) => setObservacaoConfirm(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setObservacaoConfirm(e.target.value)}
                   rows={3}
                 />
               </div>
@@ -387,9 +413,11 @@ export function RegistrarSaidaLoteModal({ open, onOpenChange, pessoasDentro }: R
       </Dialog>
 
       {/* Confirmation Modal Lote */}
-      <Dialog open={confirmandoSaidaLote} onOpenChange={(isOpen) => {
+      <Dialog open={confirmandoSaidaLote} onOpenChange={(isOpen: boolean) => {
         if (!isOpen) {
           setConfirmandoSaidaLote(false);
+          setConfirmacaoTexto('');
+          setTimerConcluido(false);
         }
       }}>
         <DialogContent className="sm:max-w-md">
@@ -419,13 +447,58 @@ export function RegistrarSaidaLoteModal({ open, onOpenChange, pessoasDentro }: R
               <Clock className="h-4 w-4" />
               <span>Horário de saída: {format(new Date(), "HH:mm", { locale: ptBR })}</span>
             </div>
+
+            {/* Lista detalhada das pessoas */}
+            <div className="border border-border rounded-lg p-3 bg-background">
+              <p className="text-sm font-medium text-foreground mb-2">Pessoas que serão afetadas:</p>
+              <div className="max-h-32 overflow-y-auto space-y-1">
+                {pessoasDentro.slice(0, 10).map((pessoa, index) => (
+                  <div key={pessoa.movimentacaoId} className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>{index + 1}. {pessoa.pessoa.nome}</span>
+                    <span className="text-primary font-medium">{formatHora(pessoa.entradaEm)}</span>
+                  </div>
+                ))}
+                {pessoasDentro.length > 10 && (
+                  <div className="text-xs text-muted-foreground text-center pt-1 border-t border-border">
+                    +{pessoasDentro.length - 10} pessoa{pessoasDentro.length - 10 > 1 ? 's' : ''}...
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Confirmação com texto */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <span className="text-destructive">⚠️</span>
+                Para confirmar, digite <span className="font-semibold text-destructive">CONFIRMAR</span>
+              </label>
+              <Input
+                placeholder="Digite CONFIRMAR para habilitar o botão"
+                value={confirmacaoTexto}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfirmacaoTexto(e.target.value)}
+                className="font-mono"
+              />
+            </div>
+
+            {/* Timer de segurança */}
+            {!timerConcluido && (
+              <div className="flex items-center justify-center p-3 bg-warning/10 border border-warning/50 rounded-lg">
+                <span className="text-warning text-sm font-medium">
+                  Aguarde {tempoRestante} segundo{tempoRestante > 1 ? 's' : ''} para confirmar
+                </span>
+              </div>
+            )}
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">
             <Button 
               type="button" 
               variant="outline" 
-              onClick={() => setConfirmandoSaidaLote(false)}
+              onClick={() => {
+                setConfirmandoSaidaLote(false);
+                setConfirmacaoTexto('');
+                setTimerConcluido(false);
+              }}
             >
               Cancelar
             </Button>
@@ -444,6 +517,8 @@ export function RegistrarSaidaLoteModal({ open, onOpenChange, pessoasDentro }: R
                   
                   // Fechar modais
                   setConfirmandoSaidaLote(false);
+                  setConfirmacaoTexto('');
+                  setTimerConcluido(false);
                   handleClose();
                 } catch (error) {
                   console.error('❌ Erro ao registrar saída em lote:', error);
@@ -451,6 +526,7 @@ export function RegistrarSaidaLoteModal({ open, onOpenChange, pessoasDentro }: R
               }} 
               variant="destructive" 
               className="px-6"
+              disabled={!timerConcluido || confirmacaoTexto !== 'CONFIRMAR'}
             >
               <LogOut className="h-4 w-4 mr-2" />
               Confirmar Saída em Lote

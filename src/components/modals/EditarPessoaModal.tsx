@@ -7,6 +7,7 @@ import { useMarina } from '@/contexts/MarinaContext';
 import { Pessoa } from '@/types/marina';
 import { FileText, Phone, Car, Users, Gift, Anchor, Briefcase } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { validateCPF, validateRG, validatePlaca } from '@/lib/validation';
 
 type TipoPessoa = 'cliente' | 'visita' | 'marinheiro' | 'proprietario' | 'colaborador' | 'prestador' | '';
 
@@ -121,10 +122,24 @@ export function EditarPessoaModal({ open, onOpenChange, pessoa }: EditarPessoaMo
             </Label>
             <Input
               id="documento"
-              placeholder="CPF, RG ou outro documento"
+              placeholder="CPF, RG ou outro documento (apenas letras e números)"
               value={formData.documento}
-              onChange={(e) => handleChange('documento', e.target.value)}
+              onChange={(e) => {
+                // Permitir apenas letras, números e espaços
+                const cleanValue = e.target.value.replace(/[^a-zA-Z0-9\s]/g, '');
+                handleChange('documento', cleanValue);
+              }}
+              onKeyDown={(e) => {
+                // Permitir teclas de controle e caracteres alfanuméricos e espaços
+                const controlKeys = ['Backspace', 'Delete', 'Tab', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', ' '];
+                const allowedKeys = /^[a-zA-Z0-9]$/;
+
+                if (!controlKeys.includes(e.key) && !allowedKeys.test(e.key)) {
+                  e.preventDefault();
+                }
+              }}
               className={cn("h-11", errors.documento ? 'border-destructive' : '')}
+              maxLength={20}
             />
             {errors.documento && (
               <p className="text-xs text-destructive">{errors.documento}</p>
@@ -159,10 +174,18 @@ export function EditarPessoaModal({ open, onOpenChange, pessoa }: EditarPessoaMo
             </Label>
             <Input
               id="contato"
-              placeholder="Telefone ou celular"
+              type="tel"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              placeholder="Telefone ou celular (apenas números)"
               value={formData.contato}
-              onChange={(e) => handleChange('contato', e.target.value)}
+              onChange={(e) => {
+                // Filtrar apenas números
+                const numericValue = e.target.value.replace(/\D/g, '');
+                handleChange('contato', numericValue);
+              }}
               className="h-11"
+              maxLength={15}
             />
           </div>
 
@@ -173,11 +196,56 @@ export function EditarPessoaModal({ open, onOpenChange, pessoa }: EditarPessoaMo
             </Label>
             <Input
               id="placa"
-              placeholder="ABC-1234"
+              placeholder="ABC1234 ou ABC1D23"
               value={formData.placa}
-              onChange={(e) => handleChange('placa', e.target.value.toUpperCase())}
-              className="h-11 font-mono"
+              onChange={(e) => {
+                let value = e.target.value.toUpperCase();
+                
+                // Se o valor atual tem hífen e o usuário está apagando, permitir a remoção
+                if (value.includes('-')) {
+                  const beforeValue = formData.placa;
+                  const currentValue = value;
+                  
+                  // Verificar se o usuário está apagando (comprimento diminuiu)
+                  if (currentValue.length < beforeValue.length) {
+                    // Se está apagando o hífen, remover o hífen e continuar
+                    if (currentValue.includes('-')) {
+                      value = value.replace('-', '');
+                    } else {
+                      // Se o hífen foi removido, manter sem hífen
+                      value = value.replace(/[^a-zA-Z0-9]/g, '');
+                    }
+                  } else {
+                    // Se está digitando, remover caracteres inválidos e inserir hífen
+                    value = value.replace(/[^a-zA-Z0-9-]/g, '');
+                    if (value.length >= 4 && !value.includes('-')) {
+                      value = value.substring(0, 3) + '-' + value.substring(3);
+                    }
+                  }
+                } else {
+                  // Sem hífen: permitir apenas letras e números
+                  value = value.replace(/[^a-zA-Z0-9]/g, '');
+                  // Inserir hífen após 3 caracteres
+                  if (value.length >= 3) {
+                    value = value.substring(0, 3) + '-' + value.substring(3);
+                  }
+                }
+                
+                handleChange('placa', value);
+              }}
+              onKeyDown={(e) => {
+                // Permitir teclas de controle
+                const controlKeys = ['Backspace', 'Delete', 'Tab', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'];
+                
+                if (!controlKeys.includes(e.key) && !/^[a-zA-Z0-9]$/.test(e.key)) {
+                  e.preventDefault();
+                }
+              }}
+              className={cn("h-11 font-mono", errors.placa ? 'border-destructive' : '')}
             />
+            {errors.placa && (
+              <p className="text-xs text-destructive">{errors.placa}</p>
+            )}
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">

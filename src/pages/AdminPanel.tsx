@@ -70,6 +70,7 @@ import { AlterarSenhaModal } from '@/components/modals/AlterarSenhaModal';
 import { RelatoriosModal } from '@/components/modals/RelatoriosModal';
 import { AuditLogsPage } from './AuditLogsPage';
 import { Navigate } from 'react-router-dom';
+import { AppUser } from '@/types/marina';
 
 export function AdminPanel() {
   const { user, empresaAtual, logout, empresas, pessoas, movimentacoes, getUsuarios, adicionarUsuario, removerUsuario, alterarSenhaUsuario, deletarEmpresa } = useMarina();
@@ -557,7 +558,7 @@ export function AdminPanel() {
                   </div>
                 </CardContent>
               </Card>
-            ) : (user?.profile?.role === 'owner' ? usuarios.length === 0 : usuarios.filter(u => u.empresa_id === user?.profile?.empresa_id).length === 0) ? (
+            ) : (user?.role === 'owner' ? usuarios.length === 0 : usuarios.filter(u => u.empresa_id === user?.empresa_id).length === 0) ? (
               <Card className="border-dashed">
                 <CardContent className="p-12 text-center">
                   <Users className="h-12 w-12 text-slate-400 mx-auto mb-4" />
@@ -597,7 +598,7 @@ export function AdminPanel() {
                           </div>
 
                           <div className="flex items-center gap-3">
-                          <Badge
+                            <Badge
                             variant={usuario.role === 'admin' || usuario.role === 'owner' ? 'default' : 'secondary'}
                             className={usuario.role === 'admin' || usuario.role === 'owner' ? 'bg-purple-500 hover:bg-purple-600' : ''}
                           >
@@ -636,11 +637,11 @@ export function AdminPanel() {
                 </div>
 
                 {/* Pagination */}
-                {getTotalPages(user?.profile?.role === 'owner' ? usuarios.length : usuarios.filter(u => u.empresa_id === user?.profile?.empresa_id).length, usuariosPageSize) > 1 && (
+                {getTotalPages(user?.role === 'owner' ? usuarios.length : usuarios.filter(u => u.empresa_id === user?.empresa_id).length, usuariosPageSize) > 1 && (
                   <div className="flex items-center justify-between">
                     <div className="text-sm text-slate-600">
                       {(() => {
-                        const filteredUsuarios = user?.profile?.role === 'owner' ? usuarios : usuarios.filter(u => u.empresa_id === user?.profile?.empresa_id);
+                        const filteredUsuarios = user?.role === 'owner' ? usuarios : usuarios.filter(u => u.empresa_id === user?.empresa_id);
                         const total = filteredUsuarios.length;
                         const start = Math.min((usuariosCurrentPage - 1) * usuariosPageSize + 1, total);
                         const end = Math.min(usuariosCurrentPage * usuariosPageSize, total);
@@ -657,8 +658,8 @@ export function AdminPanel() {
                         </PaginationItem>
 
                         {/* Page numbers */}
-                        {Array.from({ length: Math.min(5, getTotalPages(user?.profile?.role === 'owner' ? usuarios.length : usuarios.filter(u => u.empresa_id === user?.profile?.empresa_id).length, usuariosPageSize)) }, (_, i) => {
-                          const filteredUsuarios = user?.profile?.role === 'owner' ? usuarios : usuarios.filter(u => u.empresa_id === user?.profile?.empresa_id);
+                        {Array.from({ length: Math.min(5, getTotalPages(user?.role === 'owner' ? usuarios.length : usuarios.filter(u => u.empresa_id === user?.empresa_id).length, usuariosPageSize)) }, (_, i) => {
+                          const filteredUsuarios = user?.role === 'owner' ? usuarios : usuarios.filter(u => u.empresa_id === user?.empresa_id);
                           const totalPages = getTotalPages(filteredUsuarios.length, usuariosPageSize);
                           let pageNum;
 
@@ -688,10 +689,10 @@ export function AdminPanel() {
                         <PaginationItem>
                           <PaginationNext
                             onClick={() => {
-                              const filteredUsuarios = user?.profile?.role === 'owner' ? usuarios : usuarios.filter(u => u.empresa_id === user?.profile?.empresa_id);
+                              const filteredUsuarios = user?.role === 'owner' ? usuarios : usuarios.filter(u => u.empresa_id === user?.empresa_id);
                               usuariosCurrentPage < getTotalPages(filteredUsuarios.length, usuariosPageSize) && setUsuariosCurrentPage(usuariosCurrentPage + 1);
                             }}
-                            className={usuariosCurrentPage >= getTotalPages(user?.profile?.role === 'owner' ? usuarios.length : usuarios.filter(u => u.empresa_id === user?.profile?.empresa_id).length, usuariosPageSize) ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                            className={usuariosCurrentPage >= getTotalPages(user?.role === 'owner' ? usuarios.length : usuarios.filter(u => u.empresa_id === user?.empresa_id).length, usuariosPageSize) ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                           />
                         </PaginationItem>
                       </PaginationContent>

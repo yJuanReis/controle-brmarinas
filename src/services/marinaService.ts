@@ -125,8 +125,8 @@ export class MarinaService {
       }
 
       // Registrar auditoria
-      await auditService.logAction(
-        AuditAction.SAIDA,
+await auditService.logAction(
+        AuditAction.REGISTER_SAIDA,
         AuditEntityType.MOVIMENTACAO,
         movimentacaoId,
         pessoaNome,

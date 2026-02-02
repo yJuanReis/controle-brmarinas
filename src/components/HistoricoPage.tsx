@@ -1,11 +1,12 @@
-import { useState, useMemo } from 'react';
+import React from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useMarina } from '@/contexts/MarinaContext';
 import { Header } from '@/components/Header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { EditarPessoaModal } from '@/components/modals/EditarPessoaModal';
-import { RegistrarSaidaHistoricoModal } from '@/components/modals/RegistrarSaidaHistoricoModal';
+import { RegistrarSaidaPersonalizadaModal } from '@/components/modals/RegistrarSaidaPersonalizadaModal';
 import { UserTypeIcon, UserTypeAvatar } from '@/lib/userTypeIcons';
 import { Pessoa, MovimentacaoComPessoa, PessoaDentro } from '@/types/marina';
 import {
@@ -38,7 +39,8 @@ import {
   Edit,
   CalendarDays,
   BarChart3,
-  Phone
+  Phone,
+  ArrowUp
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -52,6 +54,7 @@ export function HistoricoPage() {
     nome: '',
     documento: '',
     placa: '',
+    buscaGeral: '',
   });
   const [showFilters, setShowFilters] = useState(false);
   const [editandoPessoa, setEditandoPessoa] = useState<Pessoa | null>(null);
@@ -60,20 +63,59 @@ export function HistoricoPage() {
     open: false,
     pessoa: null,
   });
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   // Pagination states
   const [listCurrentPage, setListCurrentPage] = useState(1);
-  const [listPageSize, setListPageSize] = useState(20);
+  const [listPageSize, setListPageSize] = useState(100);
   const [dailyCurrentPage, setDailyCurrentPage] = useState(1);
   const [dailyPageSize, setDailyPageSize] = useState(10);
 
-  const movimentacoes = getHistoricoMovimentacoes({
-    dataInicio: filtros.dataInicio || undefined,
-    dataFim: filtros.dataFim || undefined,
-    nome: filtros.nome || undefined,
-    documento: filtros.documento || undefined,
-    placa: filtros.placa || undefined,
-  });
+  // Efeito para controlar visibilidade do botão flutuante
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      setShowScrollTop(scrollTop > 300);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Filtragem avançada com busca geral
+  const movimentacoes = useMemo(() => {
+    const rawMovimentacoes = getHistoricoMovimentacoes({
+      dataInicio: filtros.dataInicio || undefined,
+      dataFim: filtros.dataFim || undefined,
+      nome: filtros.nome || undefined,
+      documento: filtros.documento || undefined,
+      placa: filtros.placa || undefined,
+    });
+
+    if (!filtros.buscaGeral) return rawMovimentacoes;
+
+    const termo = filtros.buscaGeral.toLowerCase();
+    
+    return rawMovimentacoes.filter(mov => {
+      // Busca em todos os campos relevantes
+      const campos = [
+        mov.pessoa.nome,
+        mov.pessoa.documento,
+        mov.pessoa.placa,
+        mov.pessoa.contato,
+        mov.pessoa.tipo,
+        mov.observacao
+      ].filter(Boolean);
+
+      return campos.some(campo => {
+        const campoStr = campo.toString().toLowerCase();
+        // Primeiro tenta busca no início (prioridade)
+        if (campoStr.startsWith(termo)) return true;
+        // Depois busca em qualquer parte do conteúdo
+        return campoStr.includes(termo);
+      });
+    });
+  }, [filtros, getHistoricoMovimentacoes]);
 
   const hasActiveFilters = Object.values(filtros).some(v => v !== '');
 
@@ -86,6 +128,7 @@ export function HistoricoPage() {
       nome: '',
       documento: '',
       placa: '',
+      buscaGeral: '',
     });
   };
 
@@ -209,6 +252,20 @@ export function HistoricoPage() {
               <Search className="h-4 w-4 text-black" />
               Filtrar registros
             </h3>
+
+            <div className="space-y-2 justify-center flex-1 max-w-md mx-auto">
+              <Label className="text-xs flex items-center gap-1 text-black justify-center">
+                <Search className="h-3 w-7" />
+                Busca geral
+              </Label>
+              <Input
+                placeholder="Buscar em todos os campos..."
+                value={filtros.buscaGeral}
+                onChange={(e) => setFiltros(prev => ({ ...prev, buscaGeral: e.target.value }))}
+              />
+            </div>
+
+
             {hasActiveFilters && (
               <Button variant="ghost" size="sm" onClick={clearFilters} className="text-black">
                 <X className="h-4 w-4 mr-1" />
@@ -239,6 +296,7 @@ export function HistoricoPage() {
                 onChange={(e) => setFiltros(prev => ({ ...prev, dataFim: e.target.value }))}
               />
             </div>
+
             <div className="space-y-2">
               <Label className="text-xs flex items-center gap-1 text-black">
                 <FileText className="h-3 w-3" />
@@ -250,6 +308,8 @@ export function HistoricoPage() {
                 onChange={(e) => setFiltros(prev => ({ ...prev, nome: e.target.value }))}
               />
             </div>
+
+
             <div className="space-y-2">
               <Label className="text-xs flex items-center gap-1 text-black">
                 <FileText className="h-3 w-3" />
@@ -261,6 +321,8 @@ export function HistoricoPage() {
                 onChange={(e) => setFiltros(prev => ({ ...prev, documento: e.target.value }))}
               />
             </div>
+
+
             <div className="space-y-2">
               <Label className="text-xs flex items-center gap-1 text-black">
                 <Car className="h-3 w-3" />
@@ -272,41 +334,68 @@ export function HistoricoPage() {
                 onChange={(e) => setFiltros(prev => ({ ...prev, placa: e.target.value.toUpperCase() }))}
               />
             </div>
+
+
+            
           </div>
+
+          {/* Controles de paginação - dentro do card de filtros */}
+          {movimentacoes.length > 0 && (
+            <div className="flex items-center justify-between mt-4">
+              <div className="flex gap-3 space-x-2 sm:col-span-5 lg:col-span-5 justify-start">
+                {viewMode === 'list' && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-black">Registros por página:</span>
+                    <Select value={listPageSize.toString()} onValueChange={(value) => { setListPageSize(parseInt(value)); setListCurrentPage(1); }}>
+                      <SelectTrigger className="w-20"><SelectValue /><SelectContent><SelectItem value="10">10</SelectItem><SelectItem value="20">20</SelectItem><SelectItem value="50">50</SelectItem><SelectItem value="100">100</SelectItem></SelectContent></SelectTrigger>
+                    </Select>
+                  </div>
+                )}
+                {viewMode === 'daily' && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-black">Dias por página:</span>
+                    <Select
+                      value={dailyPageSize.toString()}
+                      onValueChange={(value) => {
+                        setDailyPageSize(parseInt(value));
+                        setDailyCurrentPage(1);
+                      }}
+                    >
+                      <SelectTrigger className="w-20">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="5">5</SelectItem>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="20">20</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3 space-x-2 sm:col-span-5 lg:col-span-5 justify-end">
+                {viewMode === 'list' && (
+                  <>
+                    Mostrando {Math.min((listCurrentPage - 1) * listPageSize + 1, movimentacoes.length)} a{' '}
+                    {Math.min(listCurrentPage * listPageSize, movimentacoes.length)} de {movimentacoes.length} registros
+                  </>
+                )}
+                {viewMode === 'daily' && (
+                  <>
+                    Mostrando {Math.min((dailyCurrentPage - 1) * dailyPageSize + 1, movimentacoesPorDia.length)} a{' '}
+                    {Math.min(dailyCurrentPage * dailyPageSize, movimentacoesPorDia.length)} de {movimentacoesPorDia.length} dias
+                  </>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Content based on view mode */}
         {viewMode === 'daily' ? (
           /* Daily View */
           <div className="space-y-4">
-            {/* Pagination controls for daily view */}
-            {movimentacoesPorDia.length > 0 && (
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-black">Dias por página:</span>
-                  <Select
-                    value={dailyPageSize.toString()}
-                    onValueChange={(value) => {
-                      setDailyPageSize(parseInt(value));
-                      setDailyCurrentPage(1);
-                    }}
-                  >
-                    <SelectTrigger className="w-20">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="5">5</SelectItem>
-                      <SelectItem value="10">10</SelectItem>
-                      <SelectItem value="20">20</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="text-sm text-black">
-                  Mostrando {Math.min((dailyCurrentPage - 1) * dailyPageSize + 1, movimentacoesPorDia.length)} a{' '}
-                  {Math.min(dailyCurrentPage * dailyPageSize, movimentacoesPorDia.length)} de {movimentacoesPorDia.length} dias
-                </div>
-              </div>
-            )}
 
             {movimentacoesPorDia.length === 0 ? (
               <div className="card-elevated p-12 text-center">
@@ -364,98 +453,129 @@ export function HistoricoPage() {
 
                     {/* Day Movements */}
                     <div className="divide-y divide-border">
-                      {dia.movimentacoes.map((mov, movIndex) => (
-                        <div
-                          key={mov.id}
-                          className="p-5 hover:bg-muted/30 transition-colors"
-                        >
-                          <div className="flex items-start justify-between gap-4">
-                            {/* Left side - Person info */}
-                            <div className="flex items-start gap-4 flex-1 min-w-0">
-                              <UserTypeAvatar pessoa={mov.pessoa} />
-                              <div className="flex-1 min-w-0 space-y-2">
-                                {/* Name and document */}
-                                <div>
-                                  <p className="font-medium text-foreground truncate">
-                                    {mov.pessoa.nome}
-                                  </p>
-                                  <div className="flex items-center gap-2 text-sm text-black">
-                                    <FileText className="h-3.5 w-3.5" />
-                                    <span>{mov.pessoa.documento}</span>
-                                  </div>
-                                </div>
-
-                                {/* Type and contact */}
-                                <div className="flex flex-wrap items-center gap-4 text-sm">
-                                  {mov.pessoa.tipo && (
-                                    <span className="text-xs font-medium bg-primary/10 text-primary px-2.5 py-1 rounded-full">
-                                      {mov.pessoa.tipo.charAt(0).toUpperCase() + mov.pessoa.tipo.slice(1)}
-                                    </span>
-                                  )}
-
-                                  {mov.pessoa.contato && (
-                                    <div className="flex items-center gap-1 text-black">
-                                      <Phone className="h-3 w-3" />
-                                      <span>{mov.pessoa.contato}</span>
+{dia.movimentacoes.map((mov, movIndex) => (
+                        <React.Fragment key={mov.id}>
+                          {/* Linha principal */}
+                          <div
+                            key={mov.id}
+                            className="p-5 hover:bg-muted/30 transition-colors cursor-pointer"
+                            onClick={() => {
+                              const details = document.getElementById(`details-${mov.id}`);
+                              if (details) {
+                                if (details.style.display === 'none' || !details.style.display) {
+                                  details.style.display = 'block';
+                                } else {
+                                  details.style.display = 'none';
+                                }
+                              }
+                            }}
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              {/* Left side - Person info */}
+                              <div className="flex items-start gap-4 flex-1 min-w-0">
+                                <UserTypeAvatar pessoa={mov.pessoa} />
+                                <div className="flex-1 min-w-0 space-y-2">
+                                  {/* Name and document */}
+                                  <div>
+                                    <p className="font-medium text-foreground truncate">
+                                      {mov.pessoa.nome}
+                                    </p>
+                                    <div className="flex items-center gap-2 text-sm text-black">
+                                      <FileText className="h-3.5 w-3.5" />
+                                      <span>{mov.pessoa.documento}</span>
                                     </div>
-                                  )}
+                                  </div>
 
-                                  {mov.pessoa.placa && (
-                                    <div className="flex items-center gap-2">
-                                      <Car className="h-3 w-3 text-black" />
-                                      <span className="font-mono bg-muted px-2 py-0.5 rounded text-xs">
-                                        {mov.pessoa.placa}
+                                  {/* Type and contact */}
+                                  <div className="flex flex-wrap items-center gap-4 text-sm">
+                                    {mov.pessoa.tipo && (
+                                      <span className="text-xs font-medium bg-primary/10 text-primary px-2.5 py-1 rounded-full">
+                                        {mov.pessoa.tipo.charAt(0).toUpperCase() + mov.pessoa.tipo.slice(1)}
                                       </span>
-                                    </div>
-                                  )}
-                                </div>
+                                    )}
 
-                                {/* Times */}
-                                <div className="flex flex-wrap items-center gap-6 text-sm">
-                                  <div className="flex items-center gap-2">
-                                    <LogIn className="h-4 w-4 text-success" />
-                                    <div>
-                                      <p className="font-medium text-black">{formatDate(mov.entrada_em)}</p>
-                                      <p className="text-xs text-black">{formatTime(mov.entrada_em)}</p>
-                                    </div>
+                                    {mov.pessoa.contato && (
+                                      <div className="flex items-center gap-1 text-black">
+                                        <Phone className="h-3 w-3" />
+                                        <span>{mov.pessoa.contato}</span>
+                                      </div>
+                                    )}
+
+                                    {mov.pessoa.placa && (
+                                      <div className="flex items-center gap-2">
+                                        <Car className="h-3 w-3 text-black" />
+                                        <span className="font-mono bg-muted px-2 py-0.5 rounded text-xs">
+                                          {mov.pessoa.placa}
+                                        </span>
+                                      </div>
+                                    )}
                                   </div>
 
-                                  {mov.saida_em && (
+                                  {/* Times */}
+                                  <div className="flex flex-wrap items-center gap-6 text-sm">
                                     <div className="flex items-center gap-2">
-                                      <LogOut className="h-4 w-4 text-destructive" />
+                                      <LogIn className="h-4 w-4 text-success" />
                                       <div>
-                                        <p className="font-medium text-black">{formatDate(mov.saida_em)}</p>
-                                        <p className="text-xs text-black">{formatTime(mov.saida_em)}</p>
+                                        <p className="font-medium text-black">{formatDate(mov.entrada_em)}</p>
+                                        <p className="text-xs text-black">{formatTime(mov.entrada_em)}</p>
                                       </div>
                                     </div>
-                                  )}
-                                </div>
 
-                                {/* Observation */}
-                                {mov.observacao && (
-                                  <div className="flex items-start gap-2">
-                                    <FileText className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                                    <p className="text-sm text-black">
-                                      {mov.observacao}
-                                    </p>
+                                    {mov.saida_em && (
+                                      <div className="flex items-center gap-2">
+                                        <LogOut className="h-4 w-4 text-destructive" />
+                                        <div>
+                                          <p className="font-medium text-black">{formatDate(mov.saida_em)}</p>
+                                          <p className="text-xs text-black">{formatTime(mov.saida_em)}</p>
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
+                                </div>
+                              </div>
+
+                              {/* Right side - Status and actions */}
+                              <div className="flex flex-col items-end gap-3 flex-shrink-0">
+                                <span className={mov.status === 'DENTRO' ? 'status-inside' : 'status-outside'}>
+                                  <span className={cn(
+                                    "h-2 w-2 rounded-full",
+                                    mov.status === 'DENTRO' ? "bg-success animate-pulse-soft" : "bg-muted-foreground"
+                                  )} />
+                                  {mov.status === 'DENTRO' ? 'Dentro' : 'Saiu'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Linha de detalhes (observação) */}
+                          <div
+                            id={`details-${mov.id}`}
+                            className="p-5 hover:bg-muted/30 transition-colors"
+                            style={{ display: 'none' }}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="flex-shrink-0">
+                                <FileText className="h-5 w-5 text-muted-foreground" />
+                              </div>
+                              <div className="flex-1">
+                                {mov.observacao ? (
+                                  <p className="text-sm text-black whitespace-pre-wrap">
+                                    {mov.observacao}
+                                  </p>
+                                ) : (
+                                  <p className="text-sm text-red-600 font-medium">
+                                    ⚠️ Observação obrigatória
+                                  </p>
                                 )}
                               </div>
                             </div>
-
-                            {/* Right side - Status and actions */}
-                            <div className="flex flex-col items-end gap-3 flex-shrink-0">
-                              <span className={mov.status === 'DENTRO' ? 'status-inside' : 'status-outside'}>
-                                <span className={cn(
-                                  "h-2 w-2 rounded-full",
-                                  mov.status === 'DENTRO' ? "bg-success animate-pulse-soft" : "bg-muted-foreground"
-                                )} />
-                                {mov.status === 'DENTRO' ? 'Dentro' : 'Saiu'}
-                              </span>
-                            </div>
                           </div>
-                        </div>
+                        </React.Fragment>
                       ))}
+
+
+
+
 
                       {/* Pagination for daily view */}
                       {getTotalPages(movimentacoesPorDia.length, dailyPageSize) > 1 && (
@@ -520,34 +640,6 @@ export function HistoricoPage() {
         ) : (
           /* List View (Table) */
           <div className="space-y-4">
-            {/* Pagination controls for list view */}
-            {movimentacoes.length > 0 && (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-black">Itens por página:</span>
-                  <Select
-                    value={listPageSize.toString()}
-                    onValueChange={(value) => {
-                      setListPageSize(parseInt(value));
-                      setListCurrentPage(1);
-                    }}
-                  >
-                    <SelectTrigger className="w-20">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="10">10</SelectItem>
-                      <SelectItem value="20">20</SelectItem>
-                      <SelectItem value="50">50</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="text-sm text-black">
-                  Mostrando {Math.min((listCurrentPage - 1) * listPageSize + 1, movimentacoes.length)} a{' '}
-                  {Math.min(listCurrentPage * listPageSize, movimentacoes.length)} de {movimentacoes.length} registros
-                </div>
-              </div>
-            )}
 
             <div className="card-elevated-md overflow-hidden">
               {movimentacoes.length === 0 ? (
@@ -591,102 +683,151 @@ export function HistoricoPage() {
                           </th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-border">
+<tbody className="divide-y divide-border">
                         {getPaginatedItems(movimentacoes, listCurrentPage, listPageSize).map((mov, index) => (
-                          <tr
-                            key={mov.id}
-                            className="hover:bg-muted/30 transition-smooth animate-fade-in"
-                            style={{ animationDelay: `${index * 30}ms` }}
-                          >
-                            <td className="py-4 px-5">
-                              <div className="flex items-center gap-3">
-                                <UserTypeAvatar pessoa={mov.pessoa} />
-                                <div className="min-w-0">
-                                  <p className="font-medium text-black truncate">
-                                    {mov.pessoa.nome}
-                                  </p>
-                                  {mov.observacao && (
-                                    <p className="text-xs text-black truncate max-w-[200px]">
-                                      {mov.observacao}
+                          <React.Fragment key={mov.id}>
+                            {/* Linha principal */}
+                            <tr
+                              key={mov.id}
+                              className="hover:bg-muted/30 transition-smooth animate-fade-in cursor-pointer"
+                              style={{ animationDelay: `${index * 30}ms` }}
+                              onClick={() => {
+                                const details = document.getElementById(`details-${mov.id}`);
+                                if (details) {
+                                  if (details.style.display === 'none' || !details.style.display) {
+                                    details.style.display = 'table-row';
+                                  } else {
+                                    details.style.display = 'none';
+                                  }
+                                }
+                              }}
+                            >
+                              <td className="py-4 px-5">
+                                <div className="flex items-center gap-3">
+                                  <UserTypeAvatar pessoa={mov.pessoa} />
+                                  <div className="min-w-0">
+                                    <p className="font-medium text-black truncate">
+                                      {mov.pessoa.nome}
                                     </p>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="py-4 px-5 hidden sm:table-cell">
-                              <div className="flex items-center gap-2 text-sm text-black">
-                                <FileText className="h-3.5 w-3.5" />
-                                <span>{mov.pessoa.documento}</span>
-                              </div>
-                            </td>
-                            <td className="py-4 px-5 hidden lg:table-cell">
-                              {mov.pessoa.placa ? (
-                                <div className="flex items-center gap-2 text-sm">
-                                  <Car className="h-3.5 w-3.5 text-black" />
-                                  <span className="font-mono bg-muted px-2 py-0.5 rounded text-xs">
-                                    {mov.pessoa.placa}
-                                  </span>
-                                </div>
-                              ) : (
-                                <span className="text-sm text-black">—</span>
-                              )}
-                            </td>
-                            <td className="py-4 px-5">
-                              <div className="flex items-center gap-2">
-                                <LogIn className="h-3.5 w-3.5 text-success" />
-                                <div>
-                                  <p className="text-sm font-medium">{formatDate(mov.entrada_em)}</p>
-                                  <p className="text-xs text-black">{formatTime(mov.entrada_em)}</p>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="py-4 px-5 hidden md:table-cell">
-                              {mov.saida_em ? (
-                                <div className="flex items-center gap-2">
-                                  <LogOut className="h-3.5 w-3.5 text-destructive" />
-                                  <div>
-                                    <p className="text-sm font-medium">{formatDate(mov.saida_em)}</p>
-                                    <p className="text-xs text-black">{formatTime(mov.saida_em)}</p>
+                                    {mov.observacao ? (
+                                      <p className="text-xs text-black whitespace-pre-wrap mt-1 max-w-[300px] truncate">
+                                        {mov.observacao}
+                                      </p>
+                                    ) : (
+                                      <p className="text-xs text-black sm:hidden mt-1">
+                                        {mov.pessoa.documento}
+                                      </p>
+                                    )}
                                   </div>
                                 </div>
-                              ) : (
-                                <span className="text-sm text-muted-foreground">—</span>
-                              )}
-                            </td>
-                            <td className="py-4 px-5">
-                              <span className={mov.status === 'DENTRO' ? 'status-inside' : 'status-outside'}>
-                                <span className={cn(
-                                  "h-1.5 w-1.5 rounded-full",
-                                  mov.status === 'DENTRO' ? "bg-success animate-pulse-soft" : "bg-muted-foreground"
-                                )} />
-                                {mov.status === 'DENTRO' ? 'Dentro' : 'Saiu'}
-                              </span>
-                            </td>
-                            <td className="py-4 px-5 text-right">
-                              <div className="flex justify-end gap-2">
-                                {mov.status === 'DENTRO' && (
+                              </td>
+                              <td className="py-4 px-5 hidden sm:table-cell">
+                                <div className="flex items-center gap-2 text-sm text-black">
+                                  <FileText className="h-3.5 w-3.5" />
+                                  <span>{mov.pessoa.documento}</span>
+                                </div>
+                              </td>
+                              <td className="py-4 px-5 hidden lg:table-cell">
+                                {mov.pessoa.placa ? (
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Car className="h-3.5 w-3.5 text-black" />
+                                    <span className="font-mono bg-muted px-2 py-0.5 rounded text-xs">
+                                      {mov.pessoa.placa}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-sm text-black">—</span>
+                                )}
+                              </td>
+                              <td className="py-4 px-5">
+                                <div className="flex items-center gap-2">
+                                  <LogIn className="h-3.5 w-3.5 text-success" />
+                                  <div>
+                                    <p className="text-sm font-medium">{formatDate(mov.entrada_em)}</p>
+                                    <p className="text-xs text-black">{formatTime(mov.entrada_em)}</p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="py-4 px-5 hidden md:table-cell">
+                                {mov.saida_em ? (
+                                  <div className="flex items-center gap-2">
+                                    <LogOut className="h-3.5 w-3.5 text-destructive" />
+                                    <div>
+                                      <p className="text-sm font-medium">{formatDate(mov.saida_em)}</p>
+                                      <p className="text-xs text-black">{formatTime(mov.saida_em)}</p>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <span className="text-sm text-muted-foreground">—</span>
+                                )}
+                              </td>
+                              <td className="py-4 px-5">
+                                <span className={mov.status === 'DENTRO' ? 'status-inside' : 'status-outside'}>
+                                  <span className={cn(
+                                    "h-1.5 w-1.5 rounded-full",
+                                    mov.status === 'DENTRO' ? "bg-success animate-pulse-soft" : "bg-muted-foreground"
+                                  )} />
+                                  {mov.status === 'DENTRO' ? 'Dentro' : 'Saiu'}
+                                </span>
+                              </td>
+                              <td className="py-4 px-5 text-right">
+                                <div className="flex justify-end gap-2">
+                                  {mov.status === 'DENTRO' && (
+                                    <Button
+                                      size="sm"
+                                      variant="destructive"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSaidaModal({ open: true, pessoa: { movimentacaoId: mov.id, pessoa: mov.pessoa, entradaEm: mov.entrada_em } });
+                                      }}
+                                      className="gap-1.5"
+                                    >
+                                      <LogOut className="h-3.5 w-3.5" />
+                                      <span className="hidden sm:inline">Saída</span>
+                                    </Button>
+                                  )}
                                   <Button
                                     size="sm"
-                                    variant="destructive"
-                                    onClick={() => setSaidaModal({ open: true, pessoa: { movimentacaoId: mov.id, pessoa: mov.pessoa, entradaEm: mov.entrada_em } })}
+                                    variant="outline"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditandoPessoa(mov.pessoa);
+                                    }}
                                     className="gap-1.5"
                                   >
-                                    <LogOut className="h-3.5 w-3.5" />
-                                    <span className="hidden sm:inline">Saída</span>
+                                    <Edit className="h-3.5 w-3.5" />
+                                    <span className="hidden sm:inline">Editar</span>
                                   </Button>
-                                )}
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => setEditandoPessoa(mov.pessoa)}
-                                  className="gap-1.5"
-                                >
-                                  <Edit className="h-3.5 w-3.5" />
-                                  <span className="hidden sm:inline">Editar</span>
-                                </Button>
-                              </div>
-                            </td>
-                          </tr>
+                                </div>
+                              </td>
+                            </tr>
+
+                            {/* Linha de detalhes (observação) */}
+                            <tr
+                              id={`details-${mov.id}`}
+                              className="hover:bg-muted/30 transition-smooth"
+                              style={{ display: 'none' }}
+                            >
+                              <td colSpan={6} className="p-4">
+                                <div className="flex items-start gap-3">
+                                  <div className="flex-shrink-0">
+                                    <FileText className="h-5 w-5 text-muted-foreground" />
+                                  </div>
+                                  <div className="flex-1">
+                                    {mov.observacao ? (
+                                      <p className="text-sm text-black whitespace-pre-wrap">
+                                        {mov.observacao}
+                                      </p>
+                                    ) : (
+                                      <p className="text-sm text-red-600 font-medium">
+                                        ⚠️ Observação obrigatória
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          </React.Fragment>
                         ))}
                       </tbody>
                     </table>
@@ -699,53 +840,53 @@ export function HistoricoPage() {
                           Mostrando {Math.min((listCurrentPage - 1) * listPageSize + 1, movimentacoes.length)} a{' '}
                           {Math.min(listCurrentPage * listPageSize, movimentacoes.length)} de {movimentacoes.length} registros
                         </div>
-                      <Pagination>
-                        <PaginationContent>
-                          <PaginationItem>
-                            <PaginationPrevious
-                              onClick={() => listCurrentPage > 1 && setListCurrentPage(listCurrentPage - 1)}
-                              className={listCurrentPage <= 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                            />
-                          </PaginationItem>
+                        <Pagination>
+                          <PaginationContent>
+                            <PaginationItem>
+                              <PaginationPrevious
+                                onClick={() => listCurrentPage > 1 && setListCurrentPage(listCurrentPage - 1)}
+                                className={listCurrentPage <= 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                              />
+                            </PaginationItem>
 
-                          {/* Page numbers */}
-                          {Array.from({ length: Math.min(5, getTotalPages(movimentacoes.length, listPageSize)) }, (_, i) => {
-                            const totalPages = getTotalPages(movimentacoes.length, listPageSize);
-                            let pageNum;
+                            {/* Page numbers */}
+                            {Array.from({ length: Math.min(5, getTotalPages(movimentacoes.length, listPageSize)) }, (_, i) => {
+                              const totalPages = getTotalPages(movimentacoes.length, listPageSize);
+                              let pageNum;
 
-                            if (totalPages <= 5) {
-                              pageNum = i + 1;
-                            } else if (listCurrentPage <= 3) {
-                              pageNum = i + 1;
-                            } else if (listCurrentPage >= totalPages - 2) {
-                              pageNum = totalPages - 4 + i;
-                            } else {
-                              pageNum = listCurrentPage - 2 + i;
-                            }
+                              if (totalPages <= 5) {
+                                pageNum = i + 1;
+                              } else if (listCurrentPage <= 3) {
+                                pageNum = i + 1;
+                              } else if (listCurrentPage >= totalPages - 2) {
+                                pageNum = totalPages - 4 + i;
+                              } else {
+                                pageNum = listCurrentPage - 2 + i;
+                              }
 
-                            return (
-                              <PaginationItem key={pageNum}>
-                                <PaginationLink
-                                  onClick={() => setListCurrentPage(pageNum)}
-                                  isActive={listCurrentPage === pageNum}
-                                  className="cursor-pointer"
-                                >
-                                  {pageNum}
-                                </PaginationLink>
-                              </PaginationItem>
-                            );
-                          })}
+                              return (
+                                <PaginationItem key={pageNum}>
+                                  <PaginationLink
+                                    onClick={() => setListCurrentPage(pageNum)}
+                                    isActive={listCurrentPage === pageNum}
+                                    className="cursor-pointer"
+                                  >
+                                    {pageNum}
+                                  </PaginationLink>
+                                </PaginationItem>
+                              );
+                            })}
 
-                          <PaginationItem>
-                            <PaginationNext
-                              onClick={() => listCurrentPage < getTotalPages(movimentacoes.length, listPageSize) && setListCurrentPage(listCurrentPage + 1)}
-                              className={listCurrentPage >= getTotalPages(movimentacoes.length, listPageSize) ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                            />
-                          </PaginationItem>
-                        </PaginationContent>
-                      </Pagination>
-                    </div>
-                  )}
+                            <PaginationItem>
+                              <PaginationNext
+                                onClick={() => listCurrentPage < getTotalPages(movimentacoes.length, listPageSize) && setListCurrentPage(listCurrentPage + 1)}
+                                className={listCurrentPage >= getTotalPages(movimentacoes.length, listPageSize) ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                              />
+                            </PaginationItem>
+                          </PaginationContent>
+                        </Pagination>
+                      </div>
+                    )}
                 </>
               )}
             </div>
@@ -759,11 +900,25 @@ export function HistoricoPage() {
         onOpenChange={(open) => !open && setEditandoPessoa(null)}
         pessoa={editandoPessoa}
       />
-      <RegistrarSaidaHistoricoModal
+      <RegistrarSaidaPersonalizadaModal
         open={saidaModal.open}
         onOpenChange={(open) => setSaidaModal({ open, pessoa: saidaModal.pessoa })}
         pessoaDentro={saidaModal.pessoa}
       />
+
+      {/* Botão flutuante para rolar até o topo */}
+      <Button
+        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        className={`fixed bottom-6 right-6 w-12 h-12 rounded-full shadow-lg transition-all duration-300 ease-in-out ${
+          showScrollTop 
+            ? 'opacity-100 translate-y-0' 
+            : 'opacity-0 translate-y-10 pointer-events-none'
+        }`}
+        variant="default"
+        size="icon"
+      >
+        <ArrowUp className="h-6 w-6" />
+      </Button>
     </div>
   );
 }

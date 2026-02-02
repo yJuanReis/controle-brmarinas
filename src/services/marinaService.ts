@@ -24,7 +24,7 @@ export class MarinaService {
    * @param tempoLimiteHoras Tempo limite em horas (padrão: 8 horas)
    * @returns Quantidade de pessoas que tiveram saída registrada automaticamente
    */
-  public async executarSaidaAutomatica(empresaId: string, tempoLimiteHoras: number = 8): Promise<number> {
+  public async executarSaidaAutomatica(empresaId: string, tempoLimiteHoras: number = 13): Promise<number> {
     try {
       console.log(`🔍 Iniciando saída automática para empresa: ${empresaId}`);
       console.log(`⏰ Tempo limite configurado: ${tempoLimiteHoras} horas`);

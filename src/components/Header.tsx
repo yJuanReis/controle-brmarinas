@@ -63,7 +63,7 @@ export function Header() {
                 BR Marinas
               </h1>
               <p className="text-xs text-slate-300 font-medium">
-                Sistema de Controle de Acesso
+                Sistema de Controle de Acesso - Versão 3.0
               </p>
             </div>
           </div>

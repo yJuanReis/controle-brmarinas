@@ -221,8 +221,8 @@ export default function LoginPage() {
         </div>
 
         {/* Footer */}
-        <p className="text-sm text-white/90 mt-10 animate-fade-in text-center font-medium tracking-wide" style={{ animationDelay: '300ms' }}>
-          Versão 1.6 • BR Marinas
+          <p className="text-sm text-white/90 mt-10 animate-fade-in text-center font-medium tracking-wide" style={{ animationDelay: '300ms' }}>
+          Versão 3.0 • BR Marinas
         </p>
       </div>
     </div>

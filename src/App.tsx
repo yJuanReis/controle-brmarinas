@@ -12,7 +12,7 @@ import { PessoasPage } from "./pages/Pessoas";
 import { AdminPanel } from "./pages/AdminPanel";
 import NotFound from "./pages/NotFound";
 import { UnauthorizedPage } from "./pages/UnauthorizedPage";
-import { Loader2 } from "lucide-react";
+import { LoadingPage } from "./components/LoadingPage";
 
 const queryClient = new QueryClient();
 
@@ -57,14 +57,7 @@ const App = () => {
 
       // Mostra loading screen apenas durante inicialização
       if (authLoading) {
-        return (
-          <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-            <div className="flex flex-col items-center gap-4">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Verificando autenticação...</p>
-            </div>
-          </div>
-        );
+        return <LoadingPage />;
       }
 
 

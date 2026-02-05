@@ -133,15 +133,14 @@ export function RegistrarSaidaPersonalizadaModal({ open, onOpenChange, pessoaDen
           <div className="space-y-2">
             <Label className="text-sm flex items-center gap-2">
               <FileText className="h-4 w-4" />
-              Observação de Saída 
+              Observação de Saída (será adicionada ao histórico)
             </Label>
             <Textarea
-              placeholder="Ex: Saída para entrega, finalização de serviço..."
+              placeholder="Ex: Finalização de serviço, ... (será concatenado com observação da entrada)"
               value={observacao}
               onChange={(e) => setObservacao(e.target.value)}
               rows={3}
               className="resize-none"
-              required
             />
           </div>
         </div>

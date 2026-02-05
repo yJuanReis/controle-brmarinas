@@ -1,5 +1,4 @@
-import React from 'react';
-import { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useMarina } from '@/contexts/MarinaContext';
 import { Header } from '@/components/Header';
 import { Button } from '@/components/ui/button';
@@ -40,7 +39,9 @@ import {
   CalendarDays,
   BarChart3,
   Phone,
-  ArrowUp
+  ArrowUp,
+  RefreshCw,
+  ChevronDown
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -48,15 +49,26 @@ import { cn } from '@/lib/utils';
 
 export function HistoricoPage() {
   const { getHistoricoMovimentacoes } = useMarina();
+  
+  // Estado de filtros específicos (mantém a lógica existente)
   const [filtros, setFiltros] = useState({
     dataInicio: '',
     dataFim: '',
+    tipo: '',
     nome: '',
     documento: '',
     placa: '',
-    buscaGeral: '',
   });
-  const [showFilters, setShowFilters] = useState(false);
+
+  // Estado de busca global (novo)
+  const [globalSearch, setGlobalSearch] = useState('');
+
+  // Estado de paginação organizado
+  const [pagination, setPagination] = useState({
+    list: { page: 1, pageSize: 100 },
+    daily: { page: 1, pageSize: 10 }
+  });
+
   const [editandoPessoa, setEditandoPessoa] = useState<Pessoa | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'daily'>('list');
   const [saidaModal, setSaidaModal] = useState<{ open: boolean; pessoa: PessoaDentro | null }>({
@@ -64,12 +76,24 @@ export function HistoricoPage() {
     pessoa: null,
   });
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
 
-  // Pagination states
-  const [listCurrentPage, setListCurrentPage] = useState(1);
-  const [listPageSize, setListPageSize] = useState(100);
-  const [dailyCurrentPage, setDailyCurrentPage] = useState(1);
-  const [dailyPageSize, setDailyPageSize] = useState(10);
+  // Funções para controle de expansão dos cards
+  const toggleDayExpansion = useCallback((data: string) => {
+    setExpandedDays(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(data)) {
+        newSet.delete(data);
+      } else {
+        newSet.add(data);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const isDayExpanded = useCallback((data: string) => {
+    return expandedDays.has(data);
+  }, [expandedDays]);
 
   // Efeito para controlar visibilidade do botão flutuante
   useEffect(() => {
@@ -82,22 +106,26 @@ export function HistoricoPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Filtragem avançada com busca geral
-  const movimentacoes = useMemo(() => {
-    const rawMovimentacoes = getHistoricoMovimentacoes({
+  // Pipeline de filtragem otimizado
+  // 1. Dados brutos do useMarina()
+  const dadosBrutos = useMemo(() => {
+    return getHistoricoMovimentacoes({
       dataInicio: filtros.dataInicio || undefined,
       dataFim: filtros.dataFim || undefined,
+      tipo: filtros.tipo || undefined,
       nome: filtros.nome || undefined,
       documento: filtros.documento || undefined,
       placa: filtros.placa || undefined,
     });
+  }, [filtros, getHistoricoMovimentacoes]);
 
-    if (!filtros.buscaGeral) return rawMovimentacoes;
-
-    const termo = filtros.buscaGeral.toLowerCase();
+  // 2. Busca global (com debounce integrado)
+  const dadosFiltrados = useMemo(() => {
+    if (!globalSearch.trim()) return dadosBrutos;
     
-    return rawMovimentacoes.filter(mov => {
-      // Busca em todos os campos relevantes
+    const termo = globalSearch.toLowerCase().trim();
+    return dadosBrutos.filter(mov => {
+      // Busca em campos relevantes
       const campos = [
         mov.pessoa.nome,
         mov.pessoa.documento,
@@ -106,31 +134,77 @@ export function HistoricoPage() {
         mov.pessoa.tipo,
         mov.observacao
       ].filter(Boolean);
-
-      return campos.some(campo => {
-        const campoStr = campo.toString().toLowerCase();
-        // Primeiro tenta busca no início (prioridade)
-        if (campoStr.startsWith(termo)) return true;
-        // Depois busca em qualquer parte do conteúdo
-        return campoStr.includes(termo);
-      });
+      
+      return campos.some(campo => 
+        campo.toString().toLowerCase().includes(termo)
+      );
     });
-  }, [filtros, getHistoricoMovimentacoes]);
+  }, [dadosBrutos, globalSearch]);
 
-  const hasActiveFilters = Object.values(filtros).some(v => v !== '');
+  // 3. Paginação
+  const dadosPaginados = useMemo(() => {
+    const { page, pageSize } = viewMode === 'list' ? pagination.list : pagination.daily;
+    const startIndex = (page - 1) * pageSize;
+    return dadosFiltrados.slice(startIndex, startIndex + pageSize);
+  }, [dadosFiltrados, pagination, viewMode]);
 
+  // Verifica se há filtros ativos
+  const hasActiveFilters = useMemo(() => {
+    return Object.values(filtros).some(v => v !== '') || globalSearch.trim() !== '';
+  }, [filtros, globalSearch]);
 
+  // Handlers otimizados com useCallback
+  const handleFiltroChange = useCallback((campo: keyof typeof filtros, valor: string) => {
+    setFiltros(prev => ({ ...prev, [campo]: valor }));
+    // Resetar página ao alterar filtros
+    setPagination(prev => ({
+      ...prev,
+      list: { ...prev.list, page: 1 },
+      daily: { ...prev.daily, page: 1 }
+    }));
+  }, []);
 
-  const clearFilters = () => {
+  const handleGlobalSearchChange = useCallback((valor: string) => {
+    setGlobalSearch(valor);
+    // Resetar página ao alterar busca global
+    setPagination(prev => ({
+      ...prev,
+      list: { ...prev.list, page: 1 },
+      daily: { ...prev.daily, page: 1 }
+    }));
+  }, []);
+
+  const clearAllFilters = useCallback(() => {
     setFiltros({
       dataInicio: '',
       dataFim: '',
       nome: '',
       documento: '',
       placa: '',
-      buscaGeral: '',
     });
-  };
+    setGlobalSearch('');
+    setPagination({
+      list: { page: 1, pageSize: 100 },
+      daily: { page: 1, pageSize: 10 }
+    });
+  }, []);
+
+  // Controle de paginação
+  const handlePageChange = useCallback((newPage: number) => {
+    const key = viewMode === 'list' ? 'list' : 'daily';
+    setPagination(prev => ({
+      ...prev,
+      [key]: { ...prev[key], page: newPage }
+    }));
+  }, [viewMode]);
+
+  const handlePageSizeChange = useCallback((newPageSize: number) => {
+    const key = viewMode === 'list' ? 'list' : 'daily';
+    setPagination(prev => ({
+      ...prev,
+      [key]: { ...prev[key], pageSize: newPageSize, page: 1 }
+    }));
+  }, [viewMode]);
 
   const formatDateTime = (dateStr: string) => {
     if (!dateStr) return '—';
@@ -168,7 +242,7 @@ export function HistoricoPage() {
   const movimentacoesPorDia = useMemo(() => {
     const grupos: { [key: string]: MovimentacaoComPessoa[] } = {};
 
-    movimentacoes.forEach(mov => {
+    dadosFiltrados.forEach(mov => {
       const data = format(new Date(mov.entrada_em), 'yyyy-MM-dd');
       if (!grupos[data]) {
         grupos[data] = [];
@@ -188,7 +262,7 @@ export function HistoricoPage() {
         totalEntradas: movs.length,
         dentroAgora: movs.filter(m => m.status === 'DENTRO').length,
       }));
-  }, [movimentacoes, formatDate]);
+  }, [dadosFiltrados, formatDate]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -202,9 +276,7 @@ export function HistoricoPage() {
               <History className="h-6 w-6 text-primary" />
               Histórico de Movimentações
             </h2>
-            <p className="text-black">
-              {movimentacoes.length} registro{movimentacoes.length !== 1 ? 's' : ''} encontrado{movimentacoes.length !== 1 ? 's' : ''}
-            </p>
+
           </div>
           <div className="flex gap-2">
             {/* Toggle View Mode */}
@@ -229,164 +301,195 @@ export function HistoricoPage() {
               </Button>
             </div>
 
-            <Button
-              variant={showFilters ? "default" : "outline"}
-              onClick={() => setShowFilters(!showFilters)}
-              className="gap-2"
-            >
-              <Filter className="h-4 w-4" />
-              Filtros
-              {hasActiveFilters && (
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary-foreground text-primary text-xs">
-                  !
-                </span>
-              )}
-            </Button>
+
           </div>
         </div>
 
         {/* Filters panel */}
-        <div className="card-elevated p-5 mb-6 animate-fade-in">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-medium flex items-center gap-2">
-              <Search className="h-4 w-4 text-black" />
-              Filtrar registros
-            </h3>
-
-            <div className="space-y-2 justify-center flex-1 max-w-md mx-auto">
-              <Label className="text-xs flex items-center gap-1 text-black justify-center">
-                <Search className="h-3 w-7" />
-                Busca geral
-              </Label>
-              <Input
-                placeholder="Buscar em todos os campos..."
-                value={filtros.buscaGeral}
-                onChange={(e) => setFiltros(prev => ({ ...prev, buscaGeral: e.target.value }))}
-              />
+        <div className="card-elevated p-4 mb-6 animate-fade-in">
+          {/* Header compacto */}
+          <div className="flex items-center justify-between py-2 border-b border-border/50">
+            <h3 className="font-medium text-black text-sm">Filtros</h3>
+            <div className="flex items-center gap-2">
+              {hasActiveFilters && (
+                <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full font-medium">
+                  {Object.values(filtros).filter(v => v !== '').length + (globalSearch.trim() ? 1 : 0)} ativo(s)
+                </span>
+              )}
+              {hasActiveFilters && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={clearAllFilters} 
+                  className="text-xs text-black hover:bg-muted/50"
+                >
+                  <RefreshCw className="h-3 w-3 mr-1" />
+                  Limpar
+                </Button>
+              )}
             </div>
-
-
-            {hasActiveFilters && (
-              <Button variant="ghost" size="sm" onClick={clearFilters} className="text-black">
-                <X className="h-4 w-4 mr-1" />
-                Limpar
-              </Button>
-            )}
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            <div className="space-y-2">
-              <Label className="text-xs flex items-center gap-1 text-black">
-                <Calendar className="h-3 w-3" />
-                Data início
-              </Label>
+
+          {/* Busca global compacta */}
+          <div className="mt-3 mb-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Buscar em todo o histórico..."
+                value={globalSearch}
+                onChange={(e) => handleGlobalSearchChange(e.target.value)}
+                className="pl-10 h-9 text-sm border-border/50"
+              />
+              {globalSearch && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleGlobalSearchChange('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                >
+                  <X className="h-3 w-3 text-muted-foreground" />
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Filtros avançados compactos */}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {/* Data início */}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Data início</Label>
               <Input
                 type="date"
                 value={filtros.dataInicio}
-                onChange={(e) => setFiltros(prev => ({ ...prev, dataInicio: e.target.value }))}
+                onChange={(e) => handleFiltroChange('dataInicio', e.target.value)}
+                className="h-9 text-sm border-border/50"
               />
             </div>
-            <div className="space-y-2">
-              <Label className="text-xs flex items-center gap-1 text-black">
-                <Calendar className="h-3 w-3" />
-                Data fim
-              </Label>
+
+            {/* Data fim */}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Data fim</Label>
               <Input
                 type="date"
                 value={filtros.dataFim}
-                onChange={(e) => setFiltros(prev => ({ ...prev, dataFim: e.target.value }))}
+                onChange={(e) => handleFiltroChange('dataFim', e.target.value)}
+                className="h-9 text-sm border-border/50"
               />
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-xs flex items-center gap-1 text-black">
-                <FileText className="h-3 w-3" />
-                Nome
-              </Label>
+            {/* Tipo */}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Tipo</Label>
+              <Select
+                value={filtros.tipo}
+                onValueChange={(value) => handleFiltroChange('tipo', value)}
+              >
+                <SelectTrigger className="h-9 text-sm border-border/50">
+                  <SelectValue placeholder="Selecione o tipo..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="colaborador">Colaborador</SelectItem>
+                  <SelectItem value="cliente">Cliente</SelectItem>
+                  <SelectItem value="marinheiro">Marinheiro</SelectItem>
+                  <SelectItem value="prestador">Prestador de Serviço</SelectItem>
+                  <SelectItem value="proprietario">Proprietário</SelectItem>
+                  <SelectItem value="visita">Visita</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Nome */}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Nome</Label>
               <Input
                 placeholder="Buscar por nome..."
                 value={filtros.nome}
-                onChange={(e) => setFiltros(prev => ({ ...prev, nome: e.target.value }))}
+                onChange={(e) => handleFiltroChange('nome', e.target.value)}
+                className="h-9 text-sm border-border/50"
               />
             </div>
 
-
-            <div className="space-y-2">
-              <Label className="text-xs flex items-center gap-1 text-black">
-                <FileText className="h-3 w-3" />
-                Documento
-              </Label>
+            {/* Documento */}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Documento</Label>
               <Input
                 placeholder="CPF, RG..."
                 value={filtros.documento}
-                onChange={(e) => setFiltros(prev => ({ ...prev, documento: e.target.value }))}
+                onChange={(e) => handleFiltroChange('documento', e.target.value)}
+                className="h-9 text-sm border-border/50"
               />
             </div>
 
-
-            <div className="space-y-2">
-              <Label className="text-xs flex items-center gap-1 text-black">
-                <Car className="h-3 w-3" />
-                Placa
-              </Label>
+            {/* Placa */}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Placa</Label>
               <Input
                 placeholder="ABC-1234"
                 value={filtros.placa}
-                onChange={(e) => setFiltros(prev => ({ ...prev, placa: e.target.value.toUpperCase() }))}
+                onChange={(e) => handleFiltroChange('placa', e.target.value.toUpperCase())}
+                className="h-9 text-sm border-border/50"
               />
             </div>
-
-
-            
           </div>
 
-          {/* Controles de paginação - dentro do card de filtros */}
-          {movimentacoes.length > 0 && (
-            <div className="flex items-center justify-between mt-4">
-              <div className="flex gap-3 space-x-2 sm:col-span-5 lg:col-span-5 justify-start">
-                {viewMode === 'list' && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-black">Registros por página:</span>
-                    <Select value={listPageSize.toString()} onValueChange={(value) => { setListPageSize(parseInt(value)); setListCurrentPage(1); }}>
-                      <SelectTrigger className="w-20"><SelectValue /><SelectContent><SelectItem value="10">10</SelectItem><SelectItem value="20">20</SelectItem><SelectItem value="50">50</SelectItem><SelectItem value="100">100</SelectItem></SelectContent></SelectTrigger>
-                    </Select>
-                  </div>
-                )}
-                {viewMode === 'daily' && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-black">Dias por página:</span>
-                    <Select
-                      value={dailyPageSize.toString()}
-                      onValueChange={(value) => {
-                        setDailyPageSize(parseInt(value));
-                        setDailyCurrentPage(1);
-                      }}
-                    >
-                      <SelectTrigger className="w-20">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="5">5</SelectItem>
-                        <SelectItem value="10">10</SelectItem>
-                        <SelectItem value="20">20</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
+          {/* Paginação compacta */}
+          {dadosFiltrados.length > 0 && (
+            <div className="mt-4 pt-3 border-t border-border/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {viewMode === 'list' && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Registros por página:</span>
+                      <Select 
+                        value={pagination.list.pageSize.toString()} 
+                        onValueChange={(value) => handlePageSizeChange(parseInt(value))}
+                      >
+                        <SelectTrigger className="w-20 h-8 text-sm border-border/50">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="20">20</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                          <SelectItem value="100">100</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  {viewMode === 'daily' && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Dias por página:</span>
+                      <Select
+                        value={pagination.daily.pageSize.toString()}
+                        onValueChange={(value) => handlePageSizeChange(parseInt(value))}
+                      >
+                        <SelectTrigger className="w-20 h-8 text-sm border-border/50">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="5">5</SelectItem>
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="20">20</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
 
-              <div className="flex gap-3 space-x-2 sm:col-span-5 lg:col-span-5 justify-end">
-                {viewMode === 'list' && (
-                  <>
-                    Mostrando {Math.min((listCurrentPage - 1) * listPageSize + 1, movimentacoes.length)} a{' '}
-                    {Math.min(listCurrentPage * listPageSize, movimentacoes.length)} de {movimentacoes.length} registros
-                  </>
-                )}
-                {viewMode === 'daily' && (
-                  <>
-                    Mostrando {Math.min((dailyCurrentPage - 1) * dailyPageSize + 1, movimentacoesPorDia.length)} a{' '}
-                    {Math.min(dailyCurrentPage * dailyPageSize, movimentacoesPorDia.length)} de {movimentacoesPorDia.length} dias
-                  </>
-                )}
+                <div className="text-xs text-muted-foreground">
+                  {viewMode === 'list' && (
+                    <>
+                      Mostrando {Math.min((pagination.list.page - 1) * pagination.list.pageSize + 1, dadosFiltrados.length)} a{' '}
+                      {Math.min(pagination.list.page * pagination.list.pageSize, dadosFiltrados.length)} de {dadosFiltrados.length} registros
+                    </>
+                  )}
+                  {viewMode === 'daily' && (
+                    <>
+                      Mostrando {Math.min((pagination.daily.page - 1) * pagination.daily.pageSize + 1, movimentacoesPorDia.length)} a{' '}
+                      {Math.min(pagination.daily.page * pagination.daily.pageSize, movimentacoesPorDia.length)} de {movimentacoesPorDia.length} dias
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -411,7 +514,7 @@ export function HistoricoPage() {
               </div>
             ) : (
               <>
-                {getPaginatedItems(movimentacoesPorDia, dailyCurrentPage, dailyPageSize).map((dia, diaIndex) => (
+            {getPaginatedItems(movimentacoesPorDia, pagination.daily.page, pagination.daily.pageSize).map((dia, diaIndex) => (
                   <div
                     key={dia.data}
                     className="card-elevated animate-fade-in"
@@ -436,23 +539,45 @@ export function HistoricoPage() {
                             </p>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="flex items-center gap-2 text-sm">
-                            <LogIn className="h-4 w-4 text-success" />
-                            <span className="font-medium text-success">{dia.totalEntradas}</span>
-                          </div>
-                          {dia.dentroAgora > 0 && (
-                            <div className="flex items-center gap-2 text-sm mt-1">
-                              <div className="h-2 w-2 rounded-full bg-success animate-pulse-soft" />
-                              <span className="text-success">{dia.dentroAgora}</span>
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <div className="flex items-center gap-2 text-sm">
+                              <LogIn className="h-4 w-4 text-success" />
+                              <span className="font-medium text-success">{dia.totalEntradas}</span>
                             </div>
-                          )}
+                            {dia.dentroAgora > 0 && (
+                              <div className="flex items-center gap-2 text-sm mt-1">
+                                <div className="h-2 w-2 rounded-full bg-success animate-pulse-soft" />
+                                <span className="text-success">{dia.dentroAgora}</span>
+                              </div>
+                            )}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleDayExpansion(dia.data)}
+                            className="gap-2 text-sm"
+                          >
+                            <span className={cn(
+                              "transition-transform duration-200",
+                              isDayExpanded(dia.data) ? "rotate-180" : "rotate-0"
+                            )}>
+                              <ChevronDown className="h-4 w-4" />
+                            </span>
+                            <span>{isDayExpanded(dia.data) ? 'Recolher' : 'Expandir'}</span>
+                          </Button>
                         </div>
                       </div>
                     </div>
 
                     {/* Day Movements */}
-                    <div className="divide-y divide-border">
+                    <div
+                      className={cn(
+                        "overflow-hidden transition-all duration-300 ease-in-out",
+                        isDayExpanded(dia.data) ? "max-h-[5000px] opacity-100" : "max-h-0 opacity-0"
+                      )}
+                    >
+                      <div className="divide-y divide-border">
 {dia.movimentacoes.map((mov, movIndex) => (
                         <React.Fragment key={mov.id}>
                           {/* Linha principal */}
@@ -564,7 +689,6 @@ export function HistoricoPage() {
                                   </p>
                                 ) : (
                                   <p className="text-sm text-red-600 font-medium">
-                                    ⚠️ Observação obrigatória
                                   </p>
                                 )}
                               </div>
@@ -577,60 +701,61 @@ export function HistoricoPage() {
 
 
 
-                      {/* Pagination for daily view */}
-                      {getTotalPages(movimentacoesPorDia.length, dailyPageSize) > 1 && (
-                        <div className="flex items-center justify-between mt-6">
-                          <div className="text-sm text-black">
-                            Mostrando dias {Math.min((dailyCurrentPage - 1) * dailyPageSize + 1, movimentacoesPorDia.length)} a{' '}
-                            {Math.min(dailyCurrentPage * dailyPageSize, movimentacoesPorDia.length)} de {movimentacoesPorDia.length}
+                        {/* Pagination for daily view */}
+                        {getTotalPages(movimentacoesPorDia.length, pagination.daily.pageSize) > 1 && (
+                          <div className="flex items-center justify-between mt-6">
+                            <div className="text-sm text-black">
+                              Mostrando dias {Math.min((pagination.daily.page - 1) * pagination.daily.pageSize + 1, movimentacoesPorDia.length)} a{' '}
+                              {Math.min(pagination.daily.page * pagination.daily.pageSize, movimentacoesPorDia.length)} de {movimentacoesPorDia.length}
+                            </div>
+                            <Pagination>
+                              <PaginationContent>
+                                <PaginationItem>
+                                  <PaginationPrevious
+                                    onClick={() => handlePageChange(pagination.daily.page - 1)}
+                                    className={pagination.daily.page <= 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                                  />
+                                </PaginationItem>
+
+                                {/* Page numbers */}
+                                {Array.from({ length: Math.min(5, getTotalPages(movimentacoesPorDia.length, pagination.daily.pageSize)) }, (_, i) => {
+                                  const totalPages = getTotalPages(movimentacoesPorDia.length, pagination.daily.pageSize);
+                                  let pageNum;
+
+                                  if (totalPages <= 5) {
+                                    pageNum = i + 1;
+                                  } else if (pagination.daily.page <= 3) {
+                                    pageNum = i + 1;
+                                  } else if (pagination.daily.page >= totalPages - 2) {
+                                    pageNum = totalPages - 4 + i;
+                                  } else {
+                                    pageNum = pagination.daily.page - 2 + i;
+                                  }
+
+                                  return (
+                                    <PaginationItem key={pageNum}>
+                                      <PaginationLink
+                                        onClick={() => handlePageChange(pageNum)}
+                                        isActive={pagination.daily.page === pageNum}
+                                        className="cursor-pointer"
+                                      >
+                                        {pageNum}
+                                      </PaginationLink>
+                                    </PaginationItem>
+                                  );
+                                })}
+
+                                <PaginationItem>
+                                  <PaginationNext
+                                    onClick={() => handlePageChange(pagination.daily.page + 1)}
+                                    className={pagination.daily.page >= getTotalPages(movimentacoesPorDia.length, pagination.daily.pageSize) ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                                  />
+                                </PaginationItem>
+                              </PaginationContent>
+                            </Pagination>
                           </div>
-                          <Pagination>
-                            <PaginationContent>
-                              <PaginationItem>
-                                <PaginationPrevious
-                                  onClick={() => dailyCurrentPage > 1 && setDailyCurrentPage(dailyCurrentPage - 1)}
-                                  className={dailyCurrentPage <= 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                                />
-                              </PaginationItem>
-
-                              {/* Page numbers */}
-                              {Array.from({ length: Math.min(5, getTotalPages(movimentacoesPorDia.length, dailyPageSize)) }, (_, i) => {
-                                const totalPages = getTotalPages(movimentacoesPorDia.length, dailyPageSize);
-                                let pageNum;
-
-                                if (totalPages <= 5) {
-                                  pageNum = i + 1;
-                                } else if (dailyCurrentPage <= 3) {
-                                  pageNum = i + 1;
-                                } else if (dailyCurrentPage >= totalPages - 2) {
-                                  pageNum = totalPages - 4 + i;
-                                } else {
-                                  pageNum = dailyCurrentPage - 2 + i;
-                                }
-
-                                return (
-                                  <PaginationItem key={pageNum}>
-                                    <PaginationLink
-                                      onClick={() => setDailyCurrentPage(pageNum)}
-                                      isActive={dailyCurrentPage === pageNum}
-                                      className="cursor-pointer"
-                                    >
-                                      {pageNum}
-                                    </PaginationLink>
-                                  </PaginationItem>
-                                );
-                              })}
-
-                              <PaginationItem>
-                                <PaginationNext
-                                  onClick={() => dailyCurrentPage < getTotalPages(movimentacoesPorDia.length, dailyPageSize) && setDailyCurrentPage(dailyCurrentPage + 1)}
-                                  className={dailyCurrentPage >= getTotalPages(movimentacoesPorDia.length, dailyPageSize) ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                                />
-                              </PaginationItem>
-                            </PaginationContent>
-                          </Pagination>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -642,7 +767,7 @@ export function HistoricoPage() {
           <div className="space-y-4">
 
             <div className="card-elevated-md overflow-hidden">
-              {movimentacoes.length === 0 ? (
+            {dadosFiltrados.length === 0 ? (
                 <div className="p-12 text-center">
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted mx-auto mb-4">
                   <History className="h-8 w-8 text-black" />
@@ -684,7 +809,7 @@ export function HistoricoPage() {
                         </tr>
                       </thead>
 <tbody className="divide-y divide-border">
-                        {getPaginatedItems(movimentacoes, listCurrentPage, listPageSize).map((mov, index) => (
+                        {getPaginatedItems(dadosFiltrados, pagination.list.page, pagination.list.pageSize).map((mov, index) => (
                           <React.Fragment key={mov.id}>
                             {/* Linha principal */}
                             <tr
@@ -820,7 +945,7 @@ export function HistoricoPage() {
                                       </p>
                                     ) : (
                                       <p className="text-sm text-red-600 font-medium">
-                                        ⚠️ Observação obrigatória
+                                        
                                       </p>
                                     )}
                                   </div>
@@ -834,41 +959,41 @@ export function HistoricoPage() {
                   </div>
 
                     {/* Pagination for list view */}
-                    {getTotalPages(movimentacoes.length, listPageSize) > 1 && (
+                    {getTotalPages(dadosFiltrados.length, pagination.list.pageSize) > 1 && (
                       <div className="flex items-center justify-between p-4 border-t border-border">
                         <div className="text-sm text-black">
-                          Mostrando {Math.min((listCurrentPage - 1) * listPageSize + 1, movimentacoes.length)} a{' '}
-                          {Math.min(listCurrentPage * listPageSize, movimentacoes.length)} de {movimentacoes.length} registros
+                          Mostrando {Math.min((pagination.list.page - 1) * pagination.list.pageSize + 1, dadosFiltrados.length)} a{' '}
+                          {Math.min(pagination.list.page * pagination.list.pageSize, dadosFiltrados.length)} de {dadosFiltrados.length} registros
                         </div>
                         <Pagination>
                           <PaginationContent>
                             <PaginationItem>
                               <PaginationPrevious
-                                onClick={() => listCurrentPage > 1 && setListCurrentPage(listCurrentPage - 1)}
-                                className={listCurrentPage <= 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                                onClick={() => handlePageChange(pagination.list.page - 1)}
+                                className={pagination.list.page <= 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                               />
                             </PaginationItem>
 
                             {/* Page numbers */}
-                            {Array.from({ length: Math.min(5, getTotalPages(movimentacoes.length, listPageSize)) }, (_, i) => {
-                              const totalPages = getTotalPages(movimentacoes.length, listPageSize);
+                            {Array.from({ length: Math.min(5, getTotalPages(dadosFiltrados.length, pagination.list.pageSize)) }, (_, i) => {
+                              const totalPages = getTotalPages(dadosFiltrados.length, pagination.list.pageSize);
                               let pageNum;
 
                               if (totalPages <= 5) {
                                 pageNum = i + 1;
-                              } else if (listCurrentPage <= 3) {
+                              } else if (pagination.list.page <= 3) {
                                 pageNum = i + 1;
-                              } else if (listCurrentPage >= totalPages - 2) {
+                              } else if (pagination.list.page >= totalPages - 2) {
                                 pageNum = totalPages - 4 + i;
                               } else {
-                                pageNum = listCurrentPage - 2 + i;
+                                pageNum = pagination.list.page - 2 + i;
                               }
 
                               return (
                                 <PaginationItem key={pageNum}>
                                   <PaginationLink
-                                    onClick={() => setListCurrentPage(pageNum)}
-                                    isActive={listCurrentPage === pageNum}
+                                    onClick={() => handlePageChange(pageNum)}
+                                    isActive={pagination.list.page === pageNum}
                                     className="cursor-pointer"
                                   >
                                     {pageNum}
@@ -879,8 +1004,8 @@ export function HistoricoPage() {
 
                             <PaginationItem>
                               <PaginationNext
-                                onClick={() => listCurrentPage < getTotalPages(movimentacoes.length, listPageSize) && setListCurrentPage(listCurrentPage + 1)}
-                                className={listCurrentPage >= getTotalPages(movimentacoes.length, listPageSize) ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                                onClick={() => handlePageChange(pagination.list.page + 1)}
+                                className={pagination.list.page >= getTotalPages(dadosFiltrados.length, pagination.list.pageSize) ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                               />
                             </PaginationItem>
                           </PaginationContent>

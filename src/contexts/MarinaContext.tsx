@@ -3,6 +3,7 @@ import { Empresa, Pessoa, Movimentacao, PessoaDentro, NovaPessoaForm, Movimentac
 import { supabase } from '@/lib/supabase';
 import { useAuth, UserProfile } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { validators } from '@/lib/validation';
 
 interface MarinaContextType {
   // Auth state (from useAuth)
@@ -280,6 +281,12 @@ export function MarinaProvider({ children }: { children: ReactNode }) {
       return { success: false, error: validacao.motivo };
     }
 
+    // Validar observação apenas se houver conteúdo (campo opcional)
+    if (observacao !== undefined && observacao.trim() !== '' && !validators.observacao(observacao)) {
+      toast.error('Observação inválida. Deve conter pelo menos um caractere alfanumérico (letras ou números)');
+      return { success: false, error: 'Observação inválida' };
+    }
+
     try {
       // Gerar UUID para o id da movimentação
       const movimentacaoId = crypto.randomUUID();
@@ -325,6 +332,12 @@ export function MarinaProvider({ children }: { children: ReactNode }) {
         return { success: false, error: 'Pessoa já registrou saída' };
       }
 
+      // Validar observação apenas se houver conteúdo (campo opcional)
+      if (observacao !== undefined && observacao.trim() !== '' && !validators.observacao(observacao)) {
+        toast.error('Observação inválida. Deve conter pelo menos um caractere alfanumérico (letras ou números)');
+        return { success: false, error: 'Observação inválida' };
+      }
+
       const updateData: any = {
         status: 'FORA',
       };
@@ -336,9 +349,30 @@ export function MarinaProvider({ children }: { children: ReactNode }) {
         updateData.saida_em = new Date().toISOString();
       }
 
-      // Adicionar observação se fornecida
-      if (observacao !== undefined) {
-        updateData.observacao = observacao?.trim() || null;
+      // Concatenar observação da saída com a observação existente da entrada
+      if (observacao !== undefined && observacao.trim() !== '') {
+        const observacaoEntrada = movimentacao.observacao;
+        const observacaoSaida = observacao.trim();
+        
+        if (observacaoEntrada && observacaoEntrada.trim() !== '') {
+          // Concatenar observação existente com a nova
+          updateData.observacao = `${observacaoEntrada.trim()} | ${observacaoSaida}`;
+        } else {
+          // Se não houver observação de entrada, usar apenas a observação de saída
+          updateData.observacao = observacaoSaida;
+        }
+      } else {
+        // Se observação não foi fornecida, usar observação padrão para saída manual
+        const observacaoEntrada = movimentacao.observacao;
+        const observacaoSaidaPadrao = "Saída finalizada manualmente.";
+        
+        if (observacaoEntrada && observacaoEntrada.trim() !== '') {
+          // Concatenar observação existente com a observação padrão
+          updateData.observacao = `${observacaoEntrada.trim()} | ${observacaoSaidaPadrao}`;
+        } else {
+          // Se não houver observação de entrada, usar apenas a observação padrão
+          updateData.observacao = observacaoSaidaPadrao;
+        }
       }
 
       const { data: movimentacaoAtualizada, error } = await supabase

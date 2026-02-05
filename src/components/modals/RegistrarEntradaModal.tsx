@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { UserTypeAvatar } from '@/lib/userTypeIcons';
 import { validateCPF, validateRG, validatePlaca } from '@/lib/validation';
 import { smartSearch } from '@/lib/utils';
+import { validators } from '@/lib/validation';
 
 type TipoPessoa = 'cliente' | 'visita' | 'marinheiro' | 'proprietario' | 'colaborador' | 'prestador' | '';
 
@@ -457,10 +458,15 @@ onClick={() => handleSelectPessoa(pessoa.id)}
                         placeholder="Ex: Vai para o barco X, entrega de material..."
                         value={observacao}
                         onChange={(e) => setObservacao(e.target.value)}
-                        className="resize-none min-h-[100px] bg-white border-slate-300 focus:border-primary"
+                        className={`resize-none min-h-[100px] bg-white border-slate-300 focus:border-primary ${!validators.observacao(observacao) && observacao.trim() !== '' ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
                         required
                       />
-                      
+                      {!validators.observacao(observacao) && observacao.trim() !== '' && (
+                        <div className="flex items-center gap-2 text-red-600 text-sm font-medium">
+                          <AlertCircle className="h-4 w-4" />
+                          A observação deve conter pelo menos um caractere alfanumérico (letras ou números)
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -491,10 +497,10 @@ onClick={() => handleSelectPessoa(pessoa.id)}
                     <Button 
                       type="submit" 
                       size="lg"
-                      disabled={!selectedPessoaId || !validacao?.pode}
+                      disabled={!selectedPessoaId || !validacao?.pode || !validators.observacao(observacao)}
                       className={cn(
                         "flex-1 h-12 text-base font-semibold shadow-md transition-all",
-                        validacao?.pode ? "bg-green-600 hover:bg-green-700" : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                        validacao?.pode && validators.observacao(observacao) ? "bg-green-600 hover:bg-green-700" : "bg-slate-200 text-slate-400 cursor-not-allowed"
                       )}
                       onClick={(e) => {
                         if (isEditing) {

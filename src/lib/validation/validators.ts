@@ -64,5 +64,24 @@ export const validators = {
     const mercosulRegex = /^[A-Z]{3}\d[A-Z]\d{2}$/;
 
     return antigaRegex.test(cleanValue) || mercosulRegex.test(cleanValue);
+  },
+
+  /**
+   * Valida observação
+   * Rejeita strings vazias, apenas espaços em branco, apenas símbolos ou caracteres inválidos
+   * Aceita apenas se contiver pelo menos 1 caractere alfanumérico real (letras ou números)
+   */
+  observacao: (value: string): boolean => {
+    if (!value || typeof value !== 'string') return false;
+    
+    // Remove espaços em branco no início e fim
+    const trimmed = value.trim();
+    
+    // Verifica se está vazio após remover espaços
+    if (trimmed.length === 0) return false;
+    
+    // Verifica se contém pelo menos 1 caractere alfanumérico
+    // Isso rejeita strings que contêm apenas símbolos, pontuação, caracteres especiais ou apenas espaços internos
+    return /[a-zA-Z0-9]/.test(trimmed);
   }
 };

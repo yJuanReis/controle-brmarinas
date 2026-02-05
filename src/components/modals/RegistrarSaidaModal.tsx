@@ -2,11 +2,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useMarina } from '@/contexts/MarinaContext';
-import { LogOut, User, Clock, Car, Phone, MessageSquare } from 'lucide-react';
+import { LogOut, User, Clock, Car, Phone, MessageSquare, AlertCircle } from 'lucide-react';
 import { PessoaDentro } from '@/types/marina';
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { validators } from '@/lib/validation';
 
 interface RegistrarSaidaModalProps {
   open: boolean;
@@ -17,19 +18,32 @@ interface RegistrarSaidaModalProps {
 export function RegistrarSaidaModal({ open, onOpenChange, pessoaDentro }: RegistrarSaidaModalProps) {
   const { registrarSaida } = useMarina();
   const [observacaoConfirm, setObservacaoConfirm] = useState<string>('');
+  const [observacaoError, setObservacaoError] = useState<string>('');
 
   const handleConfirm = async () => {
     if (!pessoaDentro) return;
 
-    // Validate observation is not empty
-    if (observacaoConfirm.trim() === '') {
-      return; // Don't proceed if observation is empty
+    // Only validate observation if it has content (optional field)
+    if (observacaoConfirm.trim() !== '' && !validators.observacao(observacaoConfirm)) {
+      setObservacaoError('A observação deve conter pelo menos um caractere alfanumérico (letras ou números)');
+      return;
     }
 
-    const result = await registrarSaida(pessoaDentro.movimentacaoId);
+    const result = await registrarSaida(pessoaDentro.movimentacaoId, undefined, observacaoConfirm);
     if (result.success) {
       onOpenChange(false);
       setObservacaoConfirm(''); // Clear the observation after successful registration
+      setObservacaoError(''); // Clear any error
+    } else {
+      setObservacaoError(result.error || 'Erro ao registrar saída');
+    }
+  };
+
+  const handleObservacaoChange = (value: string) => {
+    setObservacaoConfirm(value);
+    // Clear error when user starts typing
+    if (observacaoError) {
+      setObservacaoError('');
     }
   };
 
@@ -107,19 +121,20 @@ export function RegistrarSaidaModal({ open, onOpenChange, pessoaDentro }: Regist
           <div className="space-y-2">
             <label className="font-medium text-sm flex items-center gap-2">
               <MessageSquare className="h-4 w-4" />
-              Observação de Saída <span className="text-red-600 font-bold">*</span>
+              Observação de Saída (será adicionada ao histórico)
             </label>
             <Textarea
-              placeholder="Ex: Saída para entrega, finalização de serviço..."
+              placeholder="Ex: Saída para entrega, finalização de serviço... (será concatenado com observação da entrada)"
               value={observacaoConfirm}
-              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setObservacaoConfirm(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleObservacaoChange(e.target.value)}
               rows={3}
-              required
+              className={observacaoError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
             />
-            {observacaoConfirm.trim() === '' && (
-              <p className="text-red-600 text-sm font-medium">
-                ⚠️ A observação é obrigatória para registrar a saída
-              </p>
+            {observacaoError && (
+              <div className="flex items-center gap-2 text-red-600 text-sm font-medium">
+                <AlertCircle className="h-4 w-4" />
+                {observacaoError}
+              </div>
             )}
           </div>
         </div>

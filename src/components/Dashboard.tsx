@@ -12,6 +12,7 @@ import { RegistrarSaidaEmLoteModal } from '@/components/modals/RegistrarSaidaEmL
 import { Pessoa } from '@/types/marina';
 import { marinaService } from '@/services/marinaService';
 import { UserTypeIcon, UserTypeAvatar } from '@/lib/userTypeIcons';
+import { supabase } from '@/lib/supabase';
 import { 
   UserPlus, 
   LogIn, 
@@ -135,10 +136,15 @@ export function Dashboard() {
 
   // Função para atualizar apenas os dados, não a página
   const handleRefresh = async () => {
-
-    // Simular atualização com delay visual
-    await new Promise(resolve => setTimeout(resolve, 500));
-
+    setIsRefreshing(true);
+    
+    try {
+      // Forçar recarregamento da página para atualizar todos os dados
+      window.location.reload();
+    } catch (error) {
+      console.error('Erro ao atualizar dados:', error);
+      setIsRefreshing(false);
+    }
   };
 
   return (

@@ -7,9 +7,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { useMarina } from '@/contexts/MarinaContext';
 import { PessoaDentro } from '@/types/marina';
 import { UserTypeAvatar } from '@/lib/userTypeIcons';
-import { LogOut, Check, MessageSquare, Search, X, History, User, Phone, Car, Clock } from 'lucide-react';
+import { LogOut, Check, MessageSquare, Search, X, History, User, Phone, Car, Clock, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { validators } from '@/lib/validation';
 
 interface RegistrarSaidaEmLoteModalProps {
   open: boolean;
@@ -49,10 +50,10 @@ export function RegistrarSaidaEmLoteModal({ open, onOpenChange, pessoasDentro }:
     return () => clearInterval(interval);
   }, [confirmandoSaidaLote, timerConcluido]);
 
-  const handleRegistrarSaida = async (movimentacaoId: string) => {
+  const handleRegistrarSaida = async (movimentacaoId: string, observacao?: string) => {
     try {
       
-      const result = await registrarSaida(movimentacaoId);
+      const result = await registrarSaida(movimentacaoId, undefined, observacao);
       
       if (result.success) {
         setSaidaRegistrada(prev => new Set(prev).add(movimentacaoId));
@@ -250,13 +251,7 @@ export function RegistrarSaidaEmLoteModal({ open, onOpenChange, pessoasDentro }:
                         }))}
                         className="text-sm"
                         rows={2}
-                        required
                       />
-                      {observacoes[item.movimentacaoId]?.trim() === '' && (
-                        <p className="text-red-600 text-xs font-medium mt-1">
-                          ⚠️ Observação obrigatória
-                        </p>
-                      )}
                     </div>
                   )}
                 </div>
@@ -367,10 +362,10 @@ export function RegistrarSaidaEmLoteModal({ open, onOpenChange, pessoasDentro }:
               <div className="space-y-2">
                 <label className="font-medium text-sm flex items-center gap-2">
                   <MessageSquare className="h-4 w-4" />
-                  Observação (opcional)
+                  Observação de Saída
                 </label>
                 <Textarea
-                  placeholder="Adicione uma observação sobre a saída..."
+                  placeholder="Ex: Saída para entrega, finalização de serviço..."
                   value={observacaoConfirm}
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setObservacaoConfirm(e.target.value)}
                   rows={3}
@@ -391,10 +386,10 @@ export function RegistrarSaidaEmLoteModal({ open, onOpenChange, pessoasDentro }:
             >
               Cancelar
             </Button>
-            <Button 
+            <Button
               onClick={() => {
                 if (confirmandoSaida) {
-                  handleRegistrarSaida(confirmandoSaida.movimentacaoId);
+                  handleRegistrarSaida(confirmandoSaida.movimentacaoId, observacaoConfirm);
                 }
               }} 
               variant="destructive" 

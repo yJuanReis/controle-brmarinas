@@ -181,3 +181,6 @@ export function formatPlaca(value: string): string {
   
   return cleanValue;
 }
+
+// Exporta o objeto validators para compatibilidade
+export { validators } from './validation/validators';

@@ -86,10 +86,8 @@ export default function LoginPage() {
   // Redirecionar automaticamente quando o usuário fica autenticado
   // Apenas redirecionar quando o perfil estiver carregado (evita loops causados por user temporário)
   useEffect(() => {
-    console.log('LoginPage useEffect:', { user: !!user, hasProfile: !!user?.profile, loading, hasRedirected: hasRedirectedRef.current });
 
     if (user && user.profile && !hasRedirectedRef.current && !loading) {
-      console.log('Usuário autenticado com perfil detectado, redirecionando para /');
       hasRedirectedRef.current = true;
       // Redirecionar imediatamente sem delay para evitar loops
       navigate('/', { replace: true });
@@ -116,7 +114,6 @@ export default function LoginPage() {
 
       if (result.success) {
         // O redirecionamento será feito pelo useEffect quando o user for atualizado
-        console.log('Login bem-sucedido');
       } else {
         setError(result.error || 'Erro de autenticação');
       }

@@ -228,14 +228,6 @@ export function PessoasPage() {
                       </span>
                     </div>
                   )}
-
-                  {/* Observação obrigatória */}
-                  <div className="flex items-start gap-2">
-                    <FileText className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm text-red-600 font-medium">
-                      ⚠️ Observação obrigatória para registro de entrada/saída
-                    </p>
-                  </div>
                 </div>
               </div>
             ))}

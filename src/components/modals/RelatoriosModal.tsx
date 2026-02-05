@@ -49,13 +49,10 @@ const getCurrentMonthRange = () => {
   };
 };
 
-// Retorna o range de um mês específico: primeiro dia 00:00:00 até último dia 23:59:59
-const getMonthRange = (monthIndex: number) => {
-  const hoje = new Date();
-  const anoAtual = hoje.getFullYear();
-  
+// Retorna o range de um mês específico de um ano: primeiro dia 00:00:00 até último dia 23:59:59
+const getMonthRange = (monthIndex: number, year: number) => {
   // Criar data para o primeiro dia do mês selecionado
-  const primeiroDia = new Date(anoAtual, monthIndex, 1);
+  const primeiroDia = new Date(year, monthIndex, 1);
   const ultimoDia = endOfMonth(primeiroDia);
   
   return {
@@ -64,6 +61,12 @@ const getMonthRange = (monthIndex: number) => {
     horaInicio: '00:00',
     horaFim: '23:59',
   };
+};
+
+// Retorna uma lista de anos para o select (atual + últimos 5 anos)
+const getAvailableYears = () => {
+  const currentYear = new Date().getFullYear();
+  return Array.from({ length: 6 }, (_, index) => currentYear - index);
 };
 
 // Função para combinar data e hora corretamente usando timezone local
@@ -79,21 +82,22 @@ const combinarDataHora = (dataStr: string, horaStr: string): Date => {
 export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
   const { user, empresas, movimentacoes, pessoas, empresaAtual: empresaContext } = useMarina();
   
-  // Valores iniciais: range do dia atual ao abrir o modal
+  // Valores iniciais: range do mês atual ao abrir o modal
   const getInitialFiltros = () => {
-    return getTodayRange();
+    return getCurrentMonthRange();
   };
 
   const [filtros, setFiltros] = useState(getInitialFiltros);
   const [formato, setFormato] = useState<ExportFormat>('pdf');
   const [isLoading, setIsLoading] = useState(false);
   const [isMonthFilter, setIsMonthFilter] = useState(false);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   // Resetar filtros quando o modal abre
   useEffect(() => {
     if (open) {
       setFiltros(getInitialFiltros());
-      setFormato('csv');
+      setFormato('pdf');
     }
   }, [open]);
 
@@ -109,34 +113,29 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
       // Filtrar movimentações da empresa do usuário
       let movimentacoesFiltradas = movimentacoes.filter(m => m.empresa_id === empresaAtual.id);
 
-      console.log('Total de movimentações da empresa:', movimentacoesFiltradas.length);
 
       // Aplicar filtros combinando data e hora corretamente
       // Quando estiver usando filtro de mês completo, ignorar os filtros de hora
       if (!isMonthFilter && filtros.dataInicio && filtros.horaInicio) {
         const dataHoraInicio = combinarDataHora(filtros.dataInicio, filtros.horaInicio);
-        console.log('Filtro início:', dataHoraInicio.toLocaleString());
         
         movimentacoesFiltradas = movimentacoesFiltradas.filter(m => {
           const entrada = new Date(m.entrada_em);
           return entrada >= dataHoraInicio;
         });
         
-        console.log('Após filtro início:', movimentacoesFiltradas.length);
       }
 
       if (!isMonthFilter && filtros.dataFim && filtros.horaFim) {
         const dataHoraFim = combinarDataHora(filtros.dataFim, filtros.horaFim);
         // Adicionar 59 segundos e 999ms para pegar até o último segundo da hora especificada
         dataHoraFim.setSeconds(59, 999);
-        console.log('Filtro fim:', dataHoraFim.toLocaleString());
         
         movimentacoesFiltradas = movimentacoesFiltradas.filter(m => {
           const entrada = new Date(m.entrada_em);
           return entrada <= dataHoraFim;
         });
         
-        console.log('Após filtro fim:', movimentacoesFiltradas.length);
       }
 
       // Quando estiver usando filtro de mês completo, aplicar filtro apenas por data (todo o dia)
@@ -144,8 +143,6 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
         const dataInicio = new Date(filtros.dataInicio);
         const dataFim = new Date(filtros.dataFim);
         
-        console.log('Filtro mês início:', dataInicio.toLocaleString());
-        console.log('Filtro mês fim:', dataFim.toLocaleString());
         
         // Definir início do dia (00:00:00)
         dataInicio.setHours(0, 0, 0, 0);
@@ -157,13 +154,11 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
           return entrada >= dataInicio && entrada <= dataFim;
         });
         
-        console.log('Após filtro mês:', movimentacoesFiltradas.length);
       }
 
       // Ordenar por data (mais recente primeiro)
       movimentacoesFiltradas.sort((a, b) => new Date(b.entrada_em).getTime() - new Date(a.entrada_em).getTime());
 
-      console.log('Movimentações filtradas final:', movimentacoesFiltradas.length);
 
       // Se não houver dados, mostrar mensagem
       if (movimentacoesFiltradas.length === 0) {
@@ -215,8 +210,6 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
 
       toast.success(`Relatório gerado com ${dadosExportacao.length} registro(s)!`);
 
-    } catch (error) {
-      console.error('Erro ao gerar relatório:', error);
       toast.error('Erro ao gerar relatório. Verifique o console para mais detalhes.');
     } finally {
       setIsLoading(false);
@@ -287,11 +280,17 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
   const exportarPDF = (dados: any[], headers: string[], empresa: any) => {
     const doc = new jsPDF();
     
+    // Configurar título centralizado
     doc.setFontSize(18);
-    doc.text(`Relatório de Movimentações`, 14, 15);
+    doc.setFont(undefined, 'bold');
+    const pageWidth = doc.internal.pageSize.width;
+    doc.text(`Relatório de Movimentações`, pageWidth / 2, 15, { align: 'center' });
+    
+    // Informações da empresa e data
     doc.setFontSize(11);
-    doc.text(`Empresa: ${empresa.nome}`, 14, 22);
-    doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm:ss')}`, 14, 28);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Empresa: ${empresa.nome}`, 14, 25);
+    doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm:ss')}`, 14, 32);
 
     const tableData = dados.map(row => [
       row.dataEntrada,
@@ -308,9 +307,30 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
     autoTable(doc, {
       head: [headers],
       body: tableData,
-      startY: 35,
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [59, 130, 246] },
+      startY: 40,
+      styles: { 
+        fontSize: 8,
+        cellPadding: 2,
+        lineColor: [0, 0, 0],
+        lineWidth: 0.1,
+        textColor: [0, 0, 0]
+      },
+      headStyles: { 
+        fillColor: [59, 130, 246],
+        textColor: [255, 255, 255],
+        lineColor: [0, 0, 0],
+        lineWidth: 0.1,
+        fontStyle: 'bold'
+      },
+      bodyStyles: {
+        lineColor: [0, 0, 0],
+        lineWidth: 0.1
+      },
+      alternateRowStyles: {
+        fillColor: [245, 245, 245],
+        lineColor: [0, 0, 0],
+        lineWidth: 0.1
+      }
     });
 
     doc.save(`relatorio_${empresa.nome}_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
@@ -390,64 +410,66 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Botão para selecionar mês */}
-              <div className="flex justify-end">
+              <div className="flex justify-start mb-2">
                 <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 hover:shadow-md hover:border-blue-300"
-                    >
-                      <Calendar className="h-4 w-4 mr-2" />
-                      Filtrar por Mês
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-96 p-6 bg-white border border-blue-100 shadow-xl rounded-lg">
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-semibold text-gray-800 mb-1">Selecione o mês</p>
-                          <p className="text-xs text-gray-500">Clique para aplicar filtro</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs text-gray-500">Ano atual</p>
-                          <p className="text-sm font-medium text-blue-600">{new Date().getFullYear()}</p>
-                        </div>
+                  <PopoverContent className="w-100 p-4 bg-white border border-blue-100 shadow-xl rounded-lg">
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        <p className="text-sm font-semibold text-gray-800">Selecione o ano</p>
+                        <Select
+                          onValueChange={(value) => {
+                            // Quando mudar o ano, manter o mês selecionado (janeiro por padrão)
+                            const selectedYear = parseInt(value);
+                            setSelectedYear(selectedYear);
+                            const currentMonth = 0; // Janeiro (índice 0)
+                            const mesRange = getMonthRange(currentMonth, selectedYear);
+                            setFiltros(mesRange);
+                            setIsMonthFilter(true);
+                          }}
+                          defaultValue={new Date().getFullYear().toString()}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Selecione o ano" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {getAvailableYears().map((year) => (
+                              <SelectItem key={year} value={year.toString()}>
+                                {year}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                       
-                      <div className="grid grid-cols-4 gap-3 max-h-72 overflow-y-auto pr-2">
+                      <div className="text-center">
+                        <p className="text-sm font-semibold text-gray-800 mb-1">Selecione o mês</p>
+                      </div>
+                      
+                      <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto">
                         {Array.from({ length: 12 }, (_, index) => {
-                          const mesRange = getMonthRange(index);
+                          const mesRange = getMonthRange(index, selectedYear);
                           const mesDate = new Date(mesRange.dataInicio);
-                          const mesNome = format(mesDate, 'MMMM', { locale: ptBR });
-                          const mesAno = format(mesDate, 'yyyy');
+                          const mesNome = format(mesDate, 'MMM', { locale: ptBR }).toUpperCase();
                           
                           return (
                             <Button
                               key={index}
                               variant="ghost"
                               size="sm"
-                              className="group justify-start text-left text-sm hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 border border-transparent hover:border-blue-200 hover:shadow-sm hover:scale-105"
+                              className="group hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 border border-transparent hover:border-blue-200 hover:shadow-sm hover:scale-105"
                               onClick={() => {
+                                const mesRange = getMonthRange(index, selectedYear);
                                 setFiltros(mesRange);
                                 setIsMonthFilter(true);
-                                // Executa o download imediatamente no formato selecionado
-                                handleDownload();
                               }}
                             >
-                              <div className="flex flex-col items-start w-full">
-                                <span className="font-medium capitalize text-gray-800 group-hover:text-blue-700">
-                                  {mesNome}
-                                </span>
-                                <span className="text-xs text-gray-500 mt-1">
-                                  {mesAno}
-                                </span>
-                              </div>
+                              <span className="font-medium text-sm capitalize text-gray-700 group-hover:text-blue-700">
+                                {mesNome}
+                              </span>
                             </Button>
                           );
                         })}
                       </div>
-                      
                     </div>
                   </PopoverContent>
                 </Popover>

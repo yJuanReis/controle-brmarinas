@@ -59,7 +59,6 @@ export function ProfessionalFormExample() {
       // Simula envio de dados
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      console.log('Dados enviados:', {
         ...formData,
         // Dados sanitizados para envio
         cpf: formData.cpf.replace(/\D/g, ''),
@@ -70,7 +69,6 @@ export function ProfessionalFormExample() {
       
       alert('Formulário enviado com sucesso!');
     } catch (error) {
-      console.error('Erro ao enviar:', error);
     } finally {
       setIsSubmitting(false);
     }

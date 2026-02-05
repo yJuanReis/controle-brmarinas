@@ -68,7 +68,6 @@ import {
 import { AdicionarUsuarioModal } from '@/components/modals/AdicionarUsuarioModal';
 import { AlterarSenhaModal } from '@/components/modals/AlterarSenhaModal';
 import { RelatoriosModal } from '@/components/modals/RelatoriosModal';
-import { AuditLogsPage } from './AuditLogsPage';
 import { Navigate } from 'react-router-dom';
 import { AppUser } from '@/types/marina';
 
@@ -100,7 +99,6 @@ export function AdminPanel() {
         const usuariosData = await getUsuarios();
         setUsuarios(usuariosData);
       } catch (error) {
-        console.error('Erro ao carregar usuários:', error);
       } finally {
         setLoadingUsuarios(false);
       }
@@ -116,7 +114,6 @@ export function AdminPanel() {
       const usuariosData = await getUsuarios();
       setUsuarios(usuariosData);
     } catch (error) {
-      console.error('Erro ao recarregar usuários:', error);
     } finally {
       setLoadingUsuarios(false);
     }
@@ -129,7 +126,6 @@ export function AdminPanel() {
       await recarregarUsuarios();
       setShowDeleteAlert(null);
     } catch (error) {
-      console.error('Erro ao remover usuário:', error);
     }
   };
 
@@ -160,8 +156,8 @@ export function AdminPanel() {
 
   // Handle tab change to reset pagination and validate permissions
   const handleTabChange = (value: string) => {
-    // Apenas usuários comuns são restritos às abas de empresas, usuários e auditoria
-    if (user?.role === 'user' && (value === 'empresas' || value === 'usuarios' || value === 'audit')) {
+    // Apenas usuários comuns são restritos às abas de empresas e usuários
+    if (user?.role === 'user' && (value === 'empresas' || value === 'usuarios')) {
       // Manter na aba atual ou redirecionar para dashboard
       return;
     }
@@ -195,9 +191,6 @@ export function AdminPanel() {
     return <Navigate to="/unauthorized" replace />;
   }
 
-  console.log('[AdminPanel] user:', user);
-  console.log('[AdminPanel] user?.role:', user?.role);
-  console.log('[AdminPanel] user?.role === "owner":', user?.role === 'owner');
 
   return (
     <TooltipProvider>
@@ -233,10 +226,6 @@ export function AdminPanel() {
                   <TabsTrigger value="usuarios" className="flex items-center gap-2">
                     <Users className="h-4 w-4" />
                     <span className="hidden sm:inline">Usuários</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="audit" className="flex items-center gap-2">
-                    <Eye className="h-4 w-4" />
-                    <span className="hidden sm:inline">Auditoria</span>
                   </TabsTrigger>
                   <TabsTrigger value="configuracoes" className="flex items-center gap-2">
                     <Settings className="h-4 w-4" />
@@ -703,10 +692,6 @@ export function AdminPanel() {
             )}
           </TabsContent>
 
-          {/* Auditoria Tab */}
-          <TabsContent value="audit" className="space-y-6">
-            <AuditLogsPage />
-          </TabsContent>
 
           {/* Configurações Tab */}
           <TabsContent value="configuracoes" className="space-y-6">
@@ -920,7 +905,6 @@ export function AdminPanel() {
                   try {
                     await deletarEmpresa(showDeleteCompanyAlert);
                   } catch (error) {
-                    console.error('Erro ao deletar empresa:', error);
                   }
                   setShowDeleteCompanyAlert(null);
                 }

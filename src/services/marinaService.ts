@@ -1,7 +1,5 @@
 import { supabase } from '@/lib/supabase';
 import { Movimentacao, PessoaDentro } from '@/types/marina';
-import { auditService } from './auditService';
-import { AuditAction, AuditEntityType } from '@/types/audit';
 
 /**
  * Serviço de gerenciamento de marina com funções de saída automática
@@ -26,8 +24,7 @@ export class MarinaService {
    */
   public async executarSaidaAutomatica(empresaId: string, tempoLimiteHoras: number = 13): Promise<number> {
     try {
-      console.log(`🔍 Iniciando saída automática para empresa: ${empresaId}`);
-      console.log(`⏰ Tempo limite configurado: ${tempoLimiteHoras} horas`);
+      console.log(`[MarinaService] Executando saída automática para empresa ${empresaId} com limite de ${tempoLimiteHoras} horas`);
 
       // Obter todas as movimentações ativas (pessoas dentro) da empresa
       const { data: movimentacoesAtivas, error } = await supabase
@@ -37,46 +34,52 @@ export class MarinaService {
         .eq('status', 'DENTRO');
 
       if (error) {
-        console.error('❌ Erro ao buscar movimentações ativas:', error);
+        console.error('[MarinaService] Erro ao buscar movimentações ativas:', error);
         throw error;
       }
 
+      console.log(`[MarinaService] Movimentações ativas encontradas: ${movimentacoesAtivas?.length || 0}`);
+
       if (!movimentacoesAtivas || movimentacoesAtivas.length === 0) {
-        console.log('✅ Nenhuma pessoa dentro da marina');
+        console.log('[MarinaService] Nenhuma movimentação ativa encontrada');
         return 0;
       }
-
-      console.log(`📍 Encontradas ${movimentacoesAtivas.length} pessoas dentro da marina`);
 
       const tempoLimiteMs = tempoLimiteHoras * 60 * 60 * 1000; // Converter horas para milissegundos
       const agora = new Date();
       let pessoasRemovidas = 0;
 
+      console.log(`[MarinaService] Tempo limite em milissegundos: ${tempoLimiteMs}`);
+      console.log(`[MarinaService] Data/hora atual: ${agora.toISOString()}`);
+
       // Processar cada movimentação
       for (const movimentacao of movimentacoesAtivas) {
         const tempoDecorrido = agora.getTime() - new Date(movimentacao.entrada_em).getTime();
+        const tempoDecorridoHoras = tempoDecorrido / (1000 * 60 * 60);
         
-        console.log(`⏱️ Pessoa ${movimentacao.pessoa_id}: tempo decorrido = ${Math.floor(tempoDecorrido / (1000 * 60))} minutos`);
+        console.log(`[MarinaService] Movimentação ${movimentacao.id}: tempo decorrido = ${tempoDecorridoHoras.toFixed(2)} horas`);
 
         if (tempoDecorrido >= tempoLimiteMs) {
-          console.log(`🚨 Pessoa ${movimentacao.pessoa_id} ultrapassou o limite! Registrando saída automática...`);
+          console.log(`[MarinaService] Movimentação ${movimentacao.id} ultrapassou o limite, registrando saída...`);
 
           // Registrar saída automática
           const resultado = await this.registrarSaidaAutomatica(movimentacao.id, tempoLimiteHoras);
           
           if (resultado.success) {
             pessoasRemovidas++;
-            console.log(`✅ Saída automática registrada para pessoa ${movimentacao.pessoa_id}`);
+            console.log(`[MarinaService] Saída registrada com sucesso para movimentação ${movimentacao.id}`);
           } else {
-            console.error(`❌ Falha ao registrar saída automática para pessoa ${movimentacao.pessoa_id}`);
+            console.error(`[MarinaService] Falha ao registrar saída para movimentação ${movimentacao.id}:`, resultado.error);
           }
+        } else {
+          console.log(`[MarinaService] Movimentação ${movimentacao.id} ainda dentro do limite`);
         }
       }
 
-      console.log(`🎉 Saída automática concluída: ${pessoasRemovidas} pessoas removidas`);
+      console.log(`[MarinaService] Saída automática concluída. Pessoas removidas: ${pessoasRemovidas}`);
       return pessoasRemovidas;
     } catch (error) {
-      console.error('❌ Erro ao executar saída automática:', error);
+      console.error('[MarinaService] Erro ao executar saída automática:', error);
       throw error;
     }
   }
@@ -97,7 +100,6 @@ export class MarinaService {
         .single();
 
       if (fetchError) {
-        console.error('❌ Erro ao buscar movimentação para auditoria:', fetchError);
         throw fetchError;
       }
 
@@ -115,50 +117,17 @@ export class MarinaService {
         .update({
           status: 'FORA',
           saida_em: new Date().toISOString(),
-          observacao: observacao
+          observacao: `${movimentacao.observacao || ''} | ${observacao}`
         })
         .eq('id', movimentacaoId);
 
       if (updateError) {
-        console.error('❌ Erro ao atualizar movimentação:', updateError);
         throw updateError;
       }
 
-      // Registrar auditoria
-await auditService.logAction(
-        AuditAction.REGISTER_SAIDA,
-        AuditEntityType.MOVIMENTACAO,
-        movimentacaoId,
-        pessoaNome,
-        {
-          before: {
-            pessoa_id: movimentacao.pessoa_id,
-            empresa_id: movimentacao.empresa_id,
-            entrada_em: movimentacao.entrada_em,
-            status: movimentacao.status,
-            observacao: movimentacao.observacao,
-            saida_em: movimentacao.saida_em
-          },
-          after: {
-            pessoa_id: movimentacao.pessoa_id,
-            empresa_id: movimentacao.empresa_id,
-            entrada_em: movimentacao.entrada_em,
-            status: 'FORA',
-            observacao: observacao,
-            saida_em: new Date().toISOString()
-          },
-          metadata: {
-            tipo_saida: 'automatica',
-            tempo_limite_horas: tempoLimiteHoras,
-            tempo_decorrido_horas: Math.floor((new Date().getTime() - new Date(movimentacao.entrada_em).getTime()) / (1000 * 60 * 60))
-          }
-        }
-      );
 
-      console.log(`✅ Saída automática registrada com sucesso para ${pessoaNome}`);
       return { success: true };
     } catch (error) {
-      console.error('❌ Erro ao registrar saída automática:', error);
       return { success: false, error: error.message };
     }
   }
@@ -183,7 +152,6 @@ await auditService.logAction(
         .eq('status', 'DENTRO');
 
       if (error) {
-        console.error('❌ Erro ao buscar movimentações ativas:', error);
         throw error;
       }
 
@@ -209,7 +177,6 @@ await auditService.logAction(
             .single();
 
           if (pessoaError) {
-            console.error('❌ Erro ao buscar pessoa:', pessoaError);
             continue;
           }
 
@@ -226,7 +193,6 @@ await auditService.logAction(
 
       return pessoasProximas;
     } catch (error) {
-      console.error('❌ Erro ao verificar pessoas próximas do limite:', error);
       throw error;
     }
   }
@@ -251,7 +217,6 @@ await auditService.logAction(
         .eq('status', 'DENTRO');
 
       if (error) {
-        console.error('❌ Erro ao buscar movimentações ativas:', error);
         throw error;
       }
 
@@ -293,7 +258,6 @@ await auditService.logAction(
         tempoMedio: Math.floor(tempoMedio / (1000 * 60 * 60)) // Em horas
       };
     } catch (error) {
-      console.error('❌ Erro ao obter estatísticas de permanência:', error);
       throw error;
     }
   }

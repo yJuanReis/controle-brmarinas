@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, getSupabaseClient } from '@/lib/supabase';
 import { UserProfile } from '@/hooks/useAuth';
 
 export function useProfile() {
@@ -9,11 +9,9 @@ export function useProfile() {
 
   // Carregar perfil do usuário atual
   const loadProfile = async (userId: string) => {
-    console.log('[Profile] loadProfile chamado para:', userId);
 
     // Verificar se já está carregando o mesmo userId
     if (loading && loadingUserId.current === userId) {
-      console.log('[Profile] Já está carregando perfil para o mesmo userId, retornando imediatamente');
       return null;
     }
 
@@ -21,7 +19,6 @@ export function useProfile() {
       setLoading(true);
       loadingUserId.current = userId;
 
-      console.log('[Profile] Fazendo query na tabela user_profiles...');
 
       // Criar um timeout curto para liberar UI rapidamente (fallback para metadata)
       const timeoutPromise = new Promise((_, reject) => {
@@ -37,22 +34,17 @@ export function useProfile() {
       const result = await Promise.race([queryPromise, timeoutPromise]) as any;
       const { data, error } = result;
 
-      console.log('[Profile] Query completada, processando resultado...');
 
       if (error) {
-        console.error('[Profile] Erro ao carregar perfil:', error);
-        console.log('[Profile] Detalhes do erro:', error.message, error.code);
 
         // Se for erro de política RLS ou recursão, tentar uma abordagem alternativa
         if (error.message && error.message.includes('infinite recursion')) {
-          console.log('[Profile] Detectada recursão infinita, tentando abordagem alternativa via RPC...');
           
           // Tentar carregar via RPC function que não tem RLS
           try {
             const { data: rpcData, error: rpcError } = await supabase.rpc('get_user_profile', { user_id: userId });
             
             if (!rpcError && rpcData) {
-              console.log('[Profile] Perfil carregado via RPC:', rpcData);
               const userProfile: UserProfile = {
                 id: rpcData.id,
                 nome: rpcData.nome,
@@ -64,7 +56,6 @@ export function useProfile() {
               return userProfile;
             }
           } catch (rpcErr) {
-            console.log('[Profile] RPC não disponível, usando fallback...');
           }
           
           return null;
@@ -72,19 +63,16 @@ export function useProfile() {
 
         // Para outros erros, continuar normalmente
         if (error.code === 'PGRST116') {
-          console.log('[Profile] Usuário não tem perfil criado ainda');
-          return null;
+            return null;
         }
         return null;
       }
 
       // Se data for null, significa que não encontrou o perfil
       if (!data) {
-        console.log('[Profile] Nenhum perfil encontrado para o usuário');
         return null;
       }
 
-      console.log('[Profile] Dados do perfil recebidos:', data);
 
       const userProfile: UserProfile = {
         id: data.id,
@@ -94,21 +82,17 @@ export function useProfile() {
         created_at: data.created_at
       };
 
-      console.log('[Profile] Perfil criado:', userProfile);
       setProfile(userProfile);
       return userProfile;
     } catch (err: any) {
-      console.error('[Profile] Erro inesperado ao carregar perfil:', err);
 
       // Se for timeout, retornar null para permitir continuação
       if (err.message && err.message.includes('Query timeout')) {
-        console.log('[Profile] Query timeout - retornando null para evitar travamento');
         return null;
       }
 
       return null;
     } finally {
-      console.log('[Profile] Finalizando loadProfile, setLoading(false)');
       setLoading(false);
       loadingUserId.current = null;
     }
@@ -144,7 +128,6 @@ export function useProfile() {
       setProfile(updatedProfile);
       return updatedProfile;
     } catch (err) {
-      console.error('Erro ao atualizar perfil:', err);
       throw err;
     }
   };
@@ -152,7 +135,6 @@ export function useProfile() {
   // Criar perfil (usado durante signup)
   const createProfile = async (userId: string, profileData: Omit<UserProfile, 'id' | 'created_at'>) => {
     try {
-      console.log('[Profile] 📝 createProfile chamado para:', userId);
 
       const { data, error } = await supabase
         .from('user_profiles')
@@ -166,16 +148,13 @@ export function useProfile() {
         .single();
 
       if (error) {
-        console.error('[Profile] ❌ Erro ao inserir perfil:', error);
         throw error;
       }
 
       if (!data) {
-        console.error('[Profile] ❌ Nenhum dado retornado após inserção');
         throw new Error('Nenhum dado retornado após criar perfil');
       }
 
-      console.log('[Profile] ✅ Perfil criado com sucesso:', data.id);
 
       const newProfile: UserProfile = {
         id: data.id,
@@ -188,15 +167,8 @@ export function useProfile() {
       setProfile(newProfile);
       return newProfile;
     } catch (err: any) {
-      console.error('[Profile] ❌ Erro ao criar perfil:', err);
       
       // Log detalhado do erro
-      if (err.code) {
-        console.error('[Profile] Código de erro:', err.code);
-      }
-      if (err.message) {
-        console.error('[Profile] Mensagem de erro:', err.message);
-      }
       
       // Re-lançar o erro para tratamento na camada superior
       throw err;

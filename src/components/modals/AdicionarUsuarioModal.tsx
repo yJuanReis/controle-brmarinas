@@ -85,8 +85,7 @@ export function AdicionarUsuarioModal({ open, onOpenChange }: AdicionarUsuarioMo
       setErrors({});
       onOpenChange(false);
     } catch (error) {
-      // Erro já é tratado no contexto
-      console.error('Erro ao adicionar usuário:', error);
+      // O erro já é tratado dentro da função adicionarUsuario
     }
   };
 

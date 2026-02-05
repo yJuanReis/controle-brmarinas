@@ -47,7 +47,6 @@ export function RegistrarSaidaPersonalizadaModal({ open, onOpenChange, pessoaDen
         setObservacao('');
       }
     } catch (error) {
-      console.error('Erro ao registrar saída:', error);
     } finally {
       setIsLoading(false);
     }
@@ -134,7 +133,7 @@ export function RegistrarSaidaPersonalizadaModal({ open, onOpenChange, pessoaDen
           <div className="space-y-2">
             <Label className="text-sm flex items-center gap-2">
               <FileText className="h-4 w-4" />
-              Observação de Saída <span className="text-red-600 font-bold">*</span>
+              Observação de Saída 
             </Label>
             <Textarea
               placeholder="Ex: Saída para entrega, finalização de serviço..."
@@ -144,11 +143,6 @@ export function RegistrarSaidaPersonalizadaModal({ open, onOpenChange, pessoaDen
               className="resize-none"
               required
             />
-            {observacao.trim() === '' && (
-              <p className="text-red-600 text-sm font-medium">
-                ⚠️ A observação é obrigatória para registrar a saída
-              </p>
-            )}
           </div>
         </div>
 

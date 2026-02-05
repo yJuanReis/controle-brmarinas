@@ -41,12 +41,6 @@ export function Header() {
     ...(podeVerAdmin ? [{ href: '/admin', label: 'Admin', icon: Settings }] : []),
   ];
 
-  console.log('[Header] user:', user);
-  console.log('[Header] user?.role:', user?.role);
-  console.log('[Header] user?.role === "owner":', user?.role === 'owner');
-  console.log('[Header] user?.role === "admin":', user?.role === 'admin');
-  console.log('[Header] podeVerAdmin:', podeVerAdmin);
-  console.log('[Header] navItems:', navItems);
 
   return (
     <header className="corporate-header sticky top-0 z-50 bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-800 shadow-lg border-b border-blue-500/30">

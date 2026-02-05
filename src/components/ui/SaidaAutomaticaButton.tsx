@@ -23,10 +23,8 @@ export function SaidaAutomaticaButton({ className }: SaidaAutomaticaButtonProps)
     try {
       setIsExecuting(true);
       
-      console.log('🚀 Iniciando saída automática...');
-      
-      // Executar saída automática
-      const pessoasRemovidas = await marinaService.executarSaidaAutomatica(empresaAtual.id, 8);
+      // Executar saída automática com 13 horas de limite
+      const pessoasRemovidas = await marinaService.executarSaidaAutomatica(empresaAtual.id, 13);
       
       if (pessoasRemovidas > 0) {
         toast.success(
@@ -49,7 +47,7 @@ export function SaidaAutomaticaButton({ className }: SaidaAutomaticaButtonProps)
         }
       } else {
         toast.info(
-          'Nenhuma pessoa ultrapassou o limite de 8 horas de permanência.',
+          'Nenhuma pessoa ultrapassou o limite de 13 horas de permanência.',
           {
             duration: 3000,
             icon: <Clock className="h-4 w-4" />
@@ -57,7 +55,7 @@ export function SaidaAutomaticaButton({ className }: SaidaAutomaticaButtonProps)
         );
       }
     } catch (error) {
-      console.error('❌ Erro ao executar saída automática:', error);
+      console.error('Erro ao executar saída automática:', error);
       toast.error('Erro ao executar saída automática. Verifique o console para mais detalhes.');
     } finally {
       setIsExecuting(false);

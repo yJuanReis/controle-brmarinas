@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import { formatters, validators } from '../lib/validation';
+import { formatName, formatPhone, formatPlaca } from '../lib/validation';
+import { validateCPF, validateRG, validatePlaca } from '../lib/validation';
 
 export type FieldType = 'cpf' | 'rg' | 'phone' | 'placa' | 'text';
 
@@ -29,12 +30,32 @@ export function useFormField(options: UseFormFieldOptions): UseFormFieldReturn {
 
   const validate = useCallback((inputValue: string) => {
     const cleanValue = inputValue.replace(/\D/g, '');
-    const validator = validators[options.type];
+    let isValid = true;
+    let error = '';
     
-    if (!validator) return { isValid: true, error: '' };
-    
-    const isValid = validator(cleanValue);
-    const error = isValid ? '' : getErrorMessage(options.type);
+    switch (options.type) {
+      case 'cpf':
+        isValid = validateCPF(cleanValue).isValid;
+        error = isValid ? '' : 'CPF inválido';
+        break;
+      case 'rg':
+        isValid = validateRG(cleanValue).isValid;
+        error = isValid ? '' : 'RG inválido';
+        break;
+      case 'phone':
+        // Para telefone, validamos se tem pelo menos 8 dígitos
+        isValid = cleanValue.length >= 8;
+        error = isValid ? '' : 'Telefone inválido';
+        break;
+      case 'placa':
+        isValid = validatePlaca(cleanValue).isValid;
+        error = isValid ? '' : 'Placa inválida';
+        break;
+      case 'text':
+        isValid = true;
+        error = '';
+        break;
+    }
     
     return { isValid, error };
   }, [options.type]);
@@ -59,8 +80,31 @@ export function useFormField(options: UseFormFieldOptions): UseFormFieldReturn {
     }
     
     // Formatação em tempo real
-    const formatter = formatters[options.type];
-    const formattedValue = formatter ? formatter(inputValue) : inputValue;
+    let formattedValue = inputValue;
+    const cleanValue = inputValue.replace(/\D/g, '');
+    
+    switch (options.type) {
+      case 'cpf':
+        // Formata CPF: 123.456.789-09
+        formattedValue = cleanValue.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+        break;
+      case 'rg':
+        // Formata RG: 12.345.678-9
+        formattedValue = cleanValue.replace(/(\d{2})(\d{3})(\d{3})(\d{1})/, '$1.$2.$3-$4');
+        break;
+      case 'phone':
+        // Formata telefone: (11) 91234-5678
+        formattedValue = formatPhone(inputValue);
+        break;
+      case 'placa':
+        // Formata placa: ABC-1234 ou ABC-1D23
+        formattedValue = formatPlaca(inputValue);
+        break;
+      case 'text':
+        // Texto: converte para maiúsculas
+        formattedValue = formatName(inputValue);
+        break;
+    }
     
     setValue(formattedValue);
     setIsDirty(true);

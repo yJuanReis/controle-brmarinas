@@ -60,7 +60,6 @@ export function AlterarSenhaModal({ open, onOpenChange, usuarioId, nomeUsuario }
       setErrors({});
       onOpenChange(false);
     } catch (error) {
-      console.error('Erro ao alterar senha:', error);
     } finally {
       setLoading(false);
     }

@@ -1,8 +1,10 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { useMarina } from '@/contexts/MarinaContext';
-import { LogOut, User, Clock, Car, Phone } from 'lucide-react';
+import { LogOut, User, Clock, Car, Phone, MessageSquare } from 'lucide-react';
 import { PessoaDentro } from '@/types/marina';
+import { useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -14,13 +16,20 @@ interface RegistrarSaidaModalProps {
 
 export function RegistrarSaidaModal({ open, onOpenChange, pessoaDentro }: RegistrarSaidaModalProps) {
   const { registrarSaida } = useMarina();
+  const [observacaoConfirm, setObservacaoConfirm] = useState<string>('');
 
   const handleConfirm = async () => {
     if (!pessoaDentro) return;
 
+    // Validate observation is not empty
+    if (observacaoConfirm.trim() === '') {
+      return; // Don't proceed if observation is empty
+    }
+
     const result = await registrarSaida(pessoaDentro.movimentacaoId);
     if (result.success) {
       onOpenChange(false);
+      setObservacaoConfirm(''); // Clear the observation after successful registration
     }
   };
 

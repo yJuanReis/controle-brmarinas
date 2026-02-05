@@ -51,22 +51,17 @@ export function RegistrarSaidaEmLoteModal({ open, onOpenChange, pessoasDentro }:
 
   const handleRegistrarSaida = async (movimentacaoId: string) => {
     try {
-      console.log('🚀 Registrando saída para movimentação:', movimentacaoId);
       
       const result = await registrarSaida(movimentacaoId);
-      console.log('✅ Resultado da saída:', result);
       
       if (result.success) {
         setSaidaRegistrada(prev => new Set(prev).add(movimentacaoId));
         setConfirmandoSaida(null);
         setHorarioSaida('');
         setObservacaoConfirm('');
-        console.log('✅ Saída registrada com sucesso');
       } else {
-        console.error('❌ Falha ao registrar saída:', result.error);
       }
     } catch (error) {
-      console.error('❌ Erro ao registrar saída:', error);
     }
   };
 
@@ -505,15 +500,12 @@ export function RegistrarSaidaEmLoteModal({ open, onOpenChange, pessoasDentro }:
             <Button 
               onClick={async () => {
                 try {
-                  console.log('🚀 Iniciando saída em lote para', pessoasDentro.length, 'pessoas');
                   
                   // Registrar saída para todas as pessoas
                   for (const pessoa of pessoasDentro) {
-                    console.log('🔄 Registrando saída para pessoa:', pessoa.pessoa.nome);
                     await handleRegistrarSaida(pessoa.movimentacaoId);
                   }
                   
-                  console.log('✅ Saída em lote concluída');
                   
                   // Fechar modais
                   setConfirmandoSaidaLote(false);
@@ -521,7 +513,6 @@ export function RegistrarSaidaEmLoteModal({ open, onOpenChange, pessoasDentro }:
                   setTimerConcluido(false);
                   handleClose();
                 } catch (error) {
-                  console.error('❌ Erro ao registrar saída em lote:', error);
                 }
               }} 
               variant="destructive" 

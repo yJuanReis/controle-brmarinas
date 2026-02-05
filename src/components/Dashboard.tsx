@@ -94,16 +94,13 @@ export function Dashboard() {
 
     const verificarTempoPermanencia = async () => {
       try {
-        console.log('⏰ Verificando tempo de permanência...');
 
         // Executar saída automática para quem ultrapassou 8 horas
         const pessoasRemovidas = await marinaService.executarSaidaAutomatica(empresaAtual.id, 8);
 
         if (pessoasRemovidas > 0) {
-          console.log(`✅ ${pessoasRemovidas} pessoa(s) removida(s) automaticamente`);
         }
       } catch (error) {
-        console.error('❌ Erro ao verificar tempo de permanência:', error);
       }
     };
 
@@ -138,14 +135,10 @@ export function Dashboard() {
 
   // Função para atualizar apenas os dados, não a página
   const handleRefresh = async () => {
-    setIsRefreshing(true);
-    console.log('🔄 Atualizando dados do painel...');
 
     // Simular atualização com delay visual
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    setIsRefreshing(false);
-    console.log('✅ Dados atualizados');
   };
 
   return (
@@ -467,7 +460,6 @@ export function Dashboard() {
         pessoaPreSelecionada={pessoaPreSelecionada}
         onPessoaPreSelecionadaUsada={() => setPessoaPreSelecionada(null)}
         onAbrirCadastro={(nomePreenchido) => {
-          console.log('🚀 onAbrirCadastro chamado com:', nomePreenchido);
           setNomePreenchidoCadastro(nomePreenchido);
           setShowCadastrar(true);
           setShowEntrada(false); // Fechar o modal de entrada

@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { MarinaProvider, useMarina } from "@/contexts/MarinaContext";
+import { useSupabaseInit } from "@/hooks/useSupabaseInit";
 import LoginPage from "./components/LoginPage";
 import Index from "./pages/Index";
 import Historico from "./pages/Historico";
@@ -16,6 +17,9 @@ import { Loader2 } from "lucide-react";
 const queryClient = new QueryClient();
 
 const App = () => {
+  // Inicializar Supabase
+  useSupabaseInit();
+
   // Protected Route para usuários autenticados
   function ProtectedRoute({ children }: { children: React.ReactNode }) {
     try {
@@ -25,7 +29,6 @@ const App = () => {
       }
       return <>{children}</>;
     } catch (err) {
-      console.error('Erro em ProtectedRoute:', err);
       return <Navigate to="/login" replace />;
     }
   }
@@ -42,7 +45,6 @@ const App = () => {
       }
       return <>{children}</>;
     } catch (err) {
-      console.error('Erro em AdminRoute:', err);
       return <Navigate to="/login" replace />;
     }
   }
@@ -52,11 +54,9 @@ const App = () => {
     try {
       const { authLoading, isAuthenticated, user } = useMarina();
 
-      console.log('AppRoutes render:', { authLoading, isAuthenticated, hasProfile: !!user?.profile });
 
       // Mostra loading screen apenas durante inicialização
       if (authLoading) {
-        console.log('Mostrando loading screen');
         return (
           <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
             <div className="flex flex-col items-center gap-4">
@@ -67,7 +67,6 @@ const App = () => {
         );
       }
 
-      console.log('Renderizando rotas normais');
 
       return (
         <Routes>
@@ -123,7 +122,6 @@ const App = () => {
         </Routes>
       );
     } catch (err) {
-      console.error('Erro em AppRoutes:', err);
       // Se houver erro de contexto, mostrar login como fallback
       return <LoginPage />;
     }

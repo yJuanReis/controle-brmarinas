@@ -178,6 +178,7 @@ export function HistoricoPage() {
     setFiltros({
       dataInicio: '',
       dataFim: '',
+      tipo: '',
       nome: '',
       documento: '',
       placa: '',

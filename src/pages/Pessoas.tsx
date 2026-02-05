@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { EditarPessoaModal } from '@/components/modals/EditarPessoaModal';
 import { CadastrarPessoaModal } from '@/components/modals/CadastrarPessoaModal';
+import { ExcluirPessoaModal } from '@/components/modals/ExcluirPessoaModal';
 import { Pessoa } from '@/types/marina';
 import { UserTypeAvatar } from '@/lib/userTypeIcons';
 import { smartSearch } from '@/lib/utils';
@@ -20,6 +21,7 @@ import {
   Users,
   Search,
   Edit,
+  Trash2,
   Phone,
   FileText,
   Car,
@@ -43,6 +45,7 @@ export function PessoasPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState('all');
   const [editandoPessoa, setEditandoPessoa] = useState<Pessoa | null>(null);
+  const [excluindoPessoa, setExcluindoPessoa] = useState<Pessoa | null>(null);
   const [showCadastrar, setShowCadastrar] = useState(false);
   const [nomePreenchidoCadastro, setNomePreenchidoCadastro] = useState<string>('');
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -190,15 +193,26 @@ export function PessoasPage() {
                       </p>
                     )}
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setEditandoPessoa(pessoa)}
-                    className="gap-1.5"
-                  >
-                    <Edit className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">Editar</span>
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setEditandoPessoa(pessoa)}
+                      className="gap-1.5"
+                    >
+                      <Edit className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Editar</span>
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setExcluindoPessoa(pessoa)}
+                      className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Excluir</span>
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="space-y-2 border-t border-border pt-4">
@@ -245,6 +259,11 @@ export function PessoasPage() {
         open={editandoPessoa !== null} 
         onOpenChange={(open) => !open && setEditandoPessoa(null)}
         pessoa={editandoPessoa}
+      />
+      <ExcluirPessoaModal 
+        open={excluindoPessoa !== null} 
+        onOpenChange={(open) => !open && setExcluindoPessoa(null)}
+        pessoa={excluindoPessoa}
       />
 
       {/* Botão flutuante para rolar até o topo */}

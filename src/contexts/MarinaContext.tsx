@@ -26,6 +26,7 @@ interface MarinaContextType {
   cadastrarPessoa: (data: NovaPessoaForm) => Promise<Pessoa>;
   buscarPessoaPorDocumento: (documento: string) => Pessoa | undefined;
   atualizarPessoa: (pessoaId: string, data: Partial<NovaPessoaForm>) => Promise<void>;
+  excluirPessoa: (pessoaId: string) => Promise<void>;
 
   // Movimentação actions
   registrarEntrada: (pessoaId: string, observacao?: string) => Promise<{ success: boolean; error?: string }>;
@@ -49,6 +50,7 @@ interface MarinaContextType {
 interface HistoricoFiltros {
   dataInicio?: string;
   dataFim?: string;
+  tipo?: string;
   nome?: string;
   documento?: string;
   placa?: string;
@@ -463,6 +465,67 @@ export function MarinaProvider({ children }: { children: ReactNode }) {
     return resultadoFinal;
   }, [movimentacoes, pessoas, empresaAtual]);
 
+  // Pessoa actions
+  const excluirPessoa = useCallback(async (pessoaId: string): Promise<void> => {
+    if (!authUser?.profile) {
+      throw new Error('Usuário não autenticado');
+    }
+
+    try {
+      // Verificar se a pessoa pertence à empresa do usuário
+      const pessoa = pessoas.find(p => p.id === pessoaId);
+      if (!pessoa) {
+        throw new Error('Pessoa não encontrada');
+      }
+
+      if (pessoa.empresa_id !== authUser.profile.empresa_id) {
+        throw new Error('Permissão negada: pessoa não pertence à sua empresa');
+      }
+
+      // Verificar se há movimentações ativas para esta pessoa
+      const movimentacoesAtivas = movimentacoes.filter(m => 
+        m.pessoa_id === pessoaId && m.status === 'DENTRO'
+      );
+
+      if (movimentacoesAtivas.length > 0) {
+        throw new Error('Não é possível excluir uma pessoa que tem movimentações ativas (dentro da marina)');
+      }
+
+      // Verificar se há movimentações associadas (para evitar violação de chave estrangeira)
+      const movimentacoesAssociadas = movimentacoes.filter(m => m.pessoa_id === pessoaId);
+
+      if (movimentacoesAssociadas.length > 0) {
+        // Tentar excluir as movimentações primeiro
+        const { error: deleteMovimentacoesError } = await supabase
+          .from('movimentacoes')
+          .delete()
+          .eq('pessoa_id', pessoaId);
+
+        if (deleteMovimentacoesError) {
+          throw new Error('Erro ao remover movimentações associadas. Não é possível excluir a pessoa.');
+        }
+
+        // Atualizar estado local das movimentações
+        setMovimentacoes(prev => prev.filter(m => m.pessoa_id !== pessoaId));
+      }
+
+      const { error } = await supabase
+        .from('pessoas')
+        .delete()
+        .eq('id', pessoaId);
+
+      if (error) throw error;
+
+      setPessoas(prev => prev.filter(p => p.id !== pessoaId));
+      
+      toast.success('Pessoa excluída com sucesso!');
+    } catch (err) {
+      const errorMessage = err.message || 'Erro ao excluir pessoa';
+      toast.error(errorMessage);
+      throw err;
+    }
+  }, [authUser?.profile, pessoas, movimentacoes]);
+
   // User management actions
   const adicionarUsuario = useCallback(async (data: { nome: string; email: string; senha: string; empresa_id: string; role?: 'user' | 'admin' | 'owner' }): Promise<void> => {
     try {
@@ -781,6 +844,7 @@ export function MarinaProvider({ children }: { children: ReactNode }) {
     cadastrarPessoa,
     buscarPessoaPorDocumento,
     atualizarPessoa,
+    excluirPessoa,
     registrarEntrada,
     registrarSaida,
     adicionarUsuario,
@@ -810,6 +874,7 @@ export function MarinaProvider({ children }: { children: ReactNode }) {
     cadastrarPessoa,
     buscarPessoaPorDocumento,
     atualizarPessoa,
+    excluirPessoa,
     registrarEntrada,
     registrarSaida,
     adicionarUsuario,

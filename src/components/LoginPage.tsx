@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Anchor, Mail, Lock, ChevronRight, AlertCircle, Info, Loader2 } from 'lucide-react';
+import { Ship, Mail, Lock, ChevronRight, AlertCircle, Info, Loader2 } from 'lucide-react';
 
 // Componente de Vídeo de Fundo com Lazy Loading
 const BackgroundVideo = () => {
@@ -139,7 +139,7 @@ export default function LoginPage() {
         {/* Logo section */}
         <div className="text-center mb-8 animate-fade-in">
           <div className="flex h-24 w-24 items-center justify-center rounded-2xl marina-header mx-auto mb-6 shadow-elevated-lg border-4 border-white/20">
-            <Anchor className="h-12 w-12 text-white drop-shadow-xl" />
+            <Ship className="h-12 w-12 text-white drop-shadow-xl" />
           </div>
           <h1 className="text-5xl font-display font-extrabold text-white mb-3 drop-shadow-2xl tracking-wide">
               BR Marinas

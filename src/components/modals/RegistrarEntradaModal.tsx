@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useMarina } from '@/contexts/MarinaContext';
 import { 
   LogIn, Search, FileText, Phone, Car, AlertCircle, 
-  UserPlus, Edit2, X, Users, Gift, Anchor, Briefcase, 
+  UserPlus, Edit2, X, Users, Gift, Ship, Briefcase, 
   CheckCircle, XCircle, Save
 } from 'lucide-react';
 import { cn } from '@/lib/utils';

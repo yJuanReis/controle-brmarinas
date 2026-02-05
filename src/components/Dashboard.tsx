@@ -22,7 +22,7 @@ import {
   Car,
   Phone,
   FileText,
-  Anchor,
+  Ship,
   Edit,
   RefreshCw,
   ArrowUp

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useMarina } from '@/contexts/MarinaContext';
-import { FileText, Phone, Car, Users, Gift, Anchor, Briefcase } from 'lucide-react';
+import { FileText, Phone, Car, Users, Gift, Ship, Briefcase } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { validateCPF, validateRG, validatePlaca, formatName, formatPhone, formatPlaca } from '@/lib/validation';
 

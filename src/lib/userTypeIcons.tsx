@@ -2,7 +2,7 @@ import {
   Users,
   User,
   Gift,
-  Anchor,
+  Ship,
   Briefcase,
   Wrench,
   HelpCircle
@@ -16,7 +16,7 @@ export function getIconForUserType(tipo?: string | null) {
     case 'visita':
       return Gift;
     case 'marinheiro':
-      return Anchor;
+      return Ship;
     case 'prestador':
       return Wrench;
     case 'proprietario':

@@ -1,4 +1,4 @@
-import { Anchor, LogOut, History, LayoutDashboard, Users, Settings, Building2, User, Clock, Activity } from 'lucide-react';
+import { Ship, LogOut, History, LayoutDashboard, Users, Settings, Building2, User, Clock, Activity } from 'lucide-react';
 import { useMarina } from '@/contexts/MarinaContext';
 import { Button } from '@/components/ui/button';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -50,7 +50,7 @@ export function Header() {
           {/* Logo e Nome da Empresa */}
           <div className="flex items-center gap-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 border border-white/20 shadow-sm">
-              <Anchor className="h-6 w-6 text-white" />
+              <Ship className="h-6 w-6 text-white" />
             </div>
             <div>
               <h1 className="text-lg font-semibold text-white tracking-wide">

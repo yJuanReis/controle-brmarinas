@@ -352,27 +352,23 @@ export function MarinaProvider({ children }: { children: ReactNode }) {
       }
 
       // Concatenar observação da saída com a observação existente da entrada
-      if (observacao !== undefined && observacao.trim() !== '') {
-        const observacaoEntrada = movimentacao.observacao;
-        const observacaoSaida = observacao.trim();
-        
-        if (observacaoEntrada && observacaoEntrada.trim() !== '') {
-          // Concatenar observação existente com a nova
-          updateData.observacao = `${observacaoEntrada.trim()} | ${observacaoSaida}`;
+      // NUNCA deixar observacao vazia ou null - sempre concatenar
+      const observacaoEntrada = movimentacao.observacao || '';
+      const observacaoSaida = (observacao || '').trim();
+      const observacaoSaidaPadrao = "Saída finalizada";
+      
+      if (observacaoSaida !== '') {
+        // Se用户提供 observação de saída, concatenar
+        if (observacaoEntrada !== '') {
+          updateData.observacao = `${observacaoEntrada} | ${observacaoSaida}`;
         } else {
-          // Se não houver observação de entrada, usar apenas a observação de saída
           updateData.observacao = observacaoSaida;
         }
       } else {
-        // Se observação não foi fornecida, usar observação padrão para saída manual
-        const observacaoEntrada = movimentacao.observacao;
-        const observacaoSaidaPadrao = "Saída finalizada manualmente.";
-        
-        if (observacaoEntrada && observacaoEntrada.trim() !== '') {
-          // Concatenar observação existente com a observação padrão
-          updateData.observacao = `${observacaoEntrada.trim()} | ${observacaoSaidaPadrao}`;
+        // Se observação não foi fornecida, usar observação padrão
+        if (observacaoEntrada !== '') {
+          updateData.observacao = `${observacaoEntrada} | ${observacaoSaidaPadrao}`;
         } else {
-          // Se não houver observação de entrada, usar apenas a observação padrão
           updateData.observacao = observacaoSaidaPadrao;
         }
       }

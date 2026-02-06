@@ -109,7 +109,17 @@ export class MarinaService {
 
       // Dados para auditoria
       const pessoaNome = movimentacao.pessoas?.nome || 'Desconhecido';
-      const observacao = `Saída automática após ${tempoLimiteHoras} horas de permanência`;
+      const observacaoSaida = `Saída automática após ${tempoLimiteHoras}h`;
+      
+      // NUNCA deixar observacao vazia ou null - sempre concatenar
+      const observacaoOriginal = movimentacao.observacao || '';
+      
+      let observacaoFinal: string;
+      if (observacaoOriginal !== '') {
+        observacaoFinal = `${observacaoOriginal} | ${observacaoSaida}`;
+      } else {
+        observacaoFinal = observacaoSaida;
+      }
 
       // Atualizar movimentação com saída automática
       const { error: updateError } = await supabase
@@ -117,7 +127,7 @@ export class MarinaService {
         .update({
           status: 'FORA',
           saida_em: new Date().toISOString(),
-          observacao: `${movimentacao.observacao || ''} | ${observacao}`
+          observacao: observacaoFinal
         })
         .eq('id', movimentacaoId);
 

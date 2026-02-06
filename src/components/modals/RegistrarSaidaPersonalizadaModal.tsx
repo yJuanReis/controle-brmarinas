@@ -30,7 +30,8 @@ export function RegistrarSaidaPersonalizadaModal({ open, onOpenChange, pessoaDen
       const now = new Date();
       const formatted = format(now, "yyyy-MM-dd'T'HH:mm", { locale: ptBR });
       setSaidaEm(formatted);
-      setObservacao(''); // Limpar observação ao abrir
+      // NÃO limpar observação - o contexto vai usar a observação original da entrada
+      // e adicionar a nova observação (se houver) ou "Saída finalizada"
     }
   }, [open]);
 

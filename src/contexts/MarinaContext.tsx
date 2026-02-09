@@ -49,6 +49,7 @@ interface MarinaContextType {
   getHistoricoMovimentacoes: (filtros?: HistoricoFiltros) => MovimentacaoComPessoa[];
   podeEntrar: (pessoaId: string) => { pode: boolean; motivo?: string };
   getUsuarios: () => Promise<AppUser[]>;
+  refreshPessoas: () => Promise<void>;
 }
 
 interface HistoricoFiltros {
@@ -292,6 +293,19 @@ export function MarinaProvider({ children }: { children: ReactNode }) {
       throw err;
     }
   }, [pessoas]);
+
+  // Refresh pessoas cache - force reload from database
+  const refreshPessoas = useCallback(async (): Promise<void> => {
+    if (!authUser?.profile) return;
+
+    try {
+      const allPessoas = await marinaService.getPessoasPorEmpresa(authUser.profile.empresa_id);
+      setPessoas(allPessoas);
+    } catch (error) {
+      console.error('[MarinaContext] Erro ao atualizar pessoas:', error);
+      toast.error('Erro ao atualizar dados de pessoas');
+    }
+  }, [authUser?.profile]);
 
   // Movimentação validation
   const podeEntrar = useCallback((pessoaId: string): { pode: boolean; motivo?: string } => {
@@ -983,6 +997,7 @@ export function MarinaProvider({ children }: { children: ReactNode }) {
     getHistoricoMovimentacoes,
     podeEntrar,
     getUsuarios,
+    refreshPessoas,
   }), [
     // Auth state
     authUser?.profile,

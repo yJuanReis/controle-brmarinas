@@ -6,7 +6,6 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Checkbox } from '@/components/ui/checkbox';
 import { useMarina } from '@/contexts/MarinaContext';
 import { marinaService } from '@/services/marinaService';
 import { Calendar, Download, FileText, FileSpreadsheet, FileText as FileTextIcon, File, Download as DownloadIcon } from 'lucide-react';
@@ -72,7 +71,7 @@ const getAvailableYears = () => {
 };
 
 export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
-  const { user, empresas, pessoas, empresaAtual: empresaContext } = useMarina();
+  const { user, empresas, pessoas, empresaAtual: empresaContext, refreshPessoas } = useMarina();
   
   // Valores iniciais: range do mês atual ao abrir o modal
   const getInitialFiltros = () => {
@@ -82,9 +81,10 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
   const [filtros, setFiltros] = useState(getInitialFiltros);
   const [formato, setFormato] = useState<ExportFormat>('pdf');
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshingData, setIsRefreshingData] = useState(false);
   const [isMonthFilter, setIsMonthFilter] = useState(false);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [incluirExcluidas, setIncluirExcluidas] = useState(false);
+  const incluirExcluidas = true; // Sempre incluir movimentações excluídas
 
   // Resetar filtros quando o modal abre
   useEffect(() => {
@@ -101,8 +101,14 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
     if (!empresaAtual) return;
 
     setIsLoading(true);
+    setIsRefreshingData(true);
 
     try {
+      // Primeiro, atualizar o cache de pessoas para garantir dados atualizados
+      await refreshPessoas();
+      
+      setIsRefreshingData(false);
+
       // Preparar parâmetros de data para a RPC
       let dataInicioStr: string;
       let dataFimStr: string;
@@ -253,18 +259,44 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
 
   const exportarPDF = (dados: any[], headers: string[], empresa: any) => {
     const doc = new jsPDF('landscape'); // Modo paisagem para mais largura
-    
-    // Configurar título centralizado
-    doc.setFontSize(18);
-    doc.setFont(undefined, 'bold');
     const pageWidth = doc.internal.pageSize.width;
-    doc.text(`Relatório de Movimentações`, pageWidth / 2, 15, { align: 'center' });
     
-    // Informações da empresa e data
-    doc.setFontSize(11);
+    // ========== CABEÇALHO ELEGANTE ==========
+    // Fundo do cabeçalho (retângulo azul marinho)
+    doc.setFillColor(30, 58, 138); // Azul marinho #1e3a8a
+    doc.rect(0, 0, pageWidth, 35, 'F');
+    
+    // Linha decorativa dourada na parte inferior do cabeçalho
+    doc.setFillColor(234, 179, 8); // Dourado #eab308
+    doc.rect(0, 33, pageWidth, 2, 'F');
+    
+    // Título principal (branco sobre fundo azul)
+    doc.setFontSize(20);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(255, 255, 255); // Branco
+    doc.text(`Relatório de Controle de Acesso`, pageWidth / 2, 14, { align: 'center' });
+    
+    // Subtítulo com nome da empresa (com prefixo BR Marinas)
+    doc.setFontSize(12);
     doc.setFont(undefined, 'normal');
-    doc.text(`Empresa: ${empresa.nome}`, 14, 25);
-    doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm:ss')}`, 14, 32);
+    doc.text(`BR Marinas | ${empresa.nome}`, pageWidth / 2, 22, { align: 'center' });
+    
+    // Período do relatório (canto esquerdo)
+    doc.setFontSize(9);
+    const periodoTexto = `Período: ${isMonthFilter ? format(new Date(filtros.dataInicio), 'MMM/yyyy', { locale: ptBR }) : `${format(new Date(filtros.dataInicio), 'dd/MM/yyyy')} a ${format(new Date(filtros.dataFim), 'dd/MM/yyyy')}`}`;
+    doc.text(periodoTexto, 15, 26, { align: 'left' });
+    
+    // Data e hora gerado (canto direito)
+    doc.setFontSize(9);
+    doc.setTextColor(255, 255, 255);
+    doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm:ss')}`, pageWidth - 15, 20, { align: 'right' });
+    doc.text(`Total de registros: ${dados.length}`, pageWidth - 15, 26, { align: 'right' });
+    
+    // Resetar cores para o conteúdo
+    doc.setTextColor(0, 0, 0);
+    
+    // Adicionar pequeno espaço antes da tabela
+    const startY = 42;
 
     const tableData = dados.map(row => [
       row.dataEntrada,
@@ -331,7 +363,6 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
     const lines = [
       separator,
       `RELATÓRIO DE MOVIMENTAÇÕES`,
-      separator,
       `Empresa: ${empresa.nome}`,
       `Período: ${periodoInfo}`,
       separator,
@@ -383,7 +414,7 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
             </div>
             <div>
               <DialogTitle className="text-xl font-bold text-gray-900 font-display">
-                Relatório de Movimentações
+                Relatório de Controle de Acesso
               </DialogTitle>
             </div>
           </div>
@@ -571,22 +602,6 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
                     </label>
                   </div>
                 </div>
-                
-                {/* Opção para incluir movimentações excluídas */}
-                <div className="flex items-center space-x-3 pt-4 border-t border-gray-100">
-                  <Checkbox
-                    id="incluirExcluidas"
-                    checked={incluirExcluidas}
-                    onCheckedChange={(checked) => setIncluirExcluidas(checked as boolean)}
-                  />
-                  <label
-                    htmlFor="incluirExcluidas"
-                    className="text-sm font-medium text-gray-700 cursor-pointer flex items-center gap-2"
-                  >
-                    <span>Incluir movimentações excluídas</span>
-                    <span className="text-xs text-muted-foreground">(registradas como excluido_em)</span>
-                  </label>
-                </div>
               </div>
             </CardContent>
           </Card>
@@ -628,10 +643,15 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
           </Button>
           <Button
             onClick={handleDownload}
-            disabled={isLoading}
+            disabled={isLoading || isRefreshingData}
             className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium px-6 py-2 rounded-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isLoading ? (
+            {isRefreshingData ? (
+              <div className="flex items-center gap-2">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                <span>Atualizando dados...</span>
+              </div>
+            ) : isLoading ? (
               <div className="flex items-center gap-2">
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                 <span>Gerando...</span>

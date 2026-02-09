@@ -6,11 +6,18 @@ import { Label } from '@/components/ui/label';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useMarina } from '@/contexts/MarinaContext';
 import { MovimentacaoComPessoa, PessoaDentro } from '@/types/marina';
-import { Clock, Calendar, FileText, LogIn, LogOut, Users, Edit, Trash2 } from 'lucide-react';
+import { FileText, LogIn, LogOut, Users, Edit, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { formatters } from '@/lib/validation';
+
+// Type guards for union type handling
+const isMovimentacaoComPessoa = (m: MovimentacaoComPessoa | PessoaDentro): m is MovimentacaoComPessoa => {
+  return 'entrada_em' in m;
+};
+
+const isPessoaDentro = (m: MovimentacaoComPessoa | PessoaDentro): m is PessoaDentro => {
+  return 'entradaEm' in m;
+};
 
 interface EditarMovimentacaoModalProps {
   open: boolean;
@@ -38,11 +45,22 @@ export function EditarMovimentacaoModal({ open, onOpenChange, movimentacao }: Ed
     }
 
     // Compatibilidade com MovimentacaoComPessoa (entrada_em) e PessoaDentro (entradaEm)
-    const entradaDate = 'entrada_em' in movimentacao && movimentacao.entrada_em 
-      ? movimentacao.entrada_em 
-      : 'entradaEm' in movimentacao && movimentacao.entradaEm
-        ? movimentacao.entradaEm
-        : null;
+    let entradaDate: string | null = null;
+    let saidaDate: string | null = null;
+    let observacao: string | null = null;
+    let pessoa: PessoaDentro['pessoa'] | MovimentacaoComPessoa['pessoa'] | null = null;
+
+    if (isMovimentacaoComPessoa(movimentacao)) {
+      entradaDate = movimentacao.entrada_em;
+      saidaDate = movimentacao.saida_em || null;
+      observacao = movimentacao.observacao || null;
+      pessoa = movimentacao.pessoa;
+    } else if (isPessoaDentro(movimentacao)) {
+      entradaDate = movimentacao.entradaEm;
+      saidaDate = null; // PessoaDentro não tem saida_em
+      observacao = movimentacao.observacao || null;
+      pessoa = movimentacao.pessoa;
+    }
 
     if (entradaDate) {
       // Converter datas para formato datetime-local
@@ -53,20 +71,19 @@ export function EditarMovimentacaoModal({ open, onOpenChange, movimentacao }: Ed
       }
       
       let saidaFormatted = '';
-      if (movimentacao.saida_em) {
-        const saida = new Date(movimentacao.saida_em);
+      if (saidaDate) {
+        const saida = new Date(saidaDate);
         if (!isNaN(saida.getTime())) {
           saidaFormatted = format(saida, "yyyy-MM-dd'T'HH:mm");
         }
       }
 
-      const pessoa = 'pessoa' in movimentacao ? movimentacao.pessoa : movimentacao.pessoa;
       const placaPessoa = pessoa?.placa || '';
 
       setFormData({
         entrada_em: entradaFormatted,
         saida_em: saidaFormatted,
-        observacao: movimentacao.observacao || '',
+        observacao: observacao || '',
         placa: placaPessoa,
       });
       setPlacaOriginal(placaPessoa);
@@ -108,8 +125,16 @@ export function EditarMovimentacaoModal({ open, onOpenChange, movimentacao }: Ed
     e.preventDefault();
     if (!validate() || !movimentacao) return;
 
-    const movimentacaoId = 'movimentacaoId' in movimentacao ? movimentacao.movimentacaoId : movimentacao.id;
-    const pessoa = 'pessoa' in movimentacao ? movimentacao.pessoa : movimentacao.pessoa;
+    let movimentacaoId: string;
+    let pessoa: PessoaDentro['pessoa'] | MovimentacaoComPessoa['pessoa'] | null = null;
+
+    if (isMovimentacaoComPessoa(movimentacao)) {
+      movimentacaoId = movimentacao.id;
+      pessoa = movimentacao.pessoa;
+    } else {
+      movimentacaoId = movimentacao.movimentacaoId;
+      pessoa = movimentacao.pessoa;
+    }
 
     await atualizarMovimentacao(movimentacaoId, {
       entrada_em: new Date(formData.entrada_em).toISOString(),
@@ -134,7 +159,25 @@ export function EditarMovimentacaoModal({ open, onOpenChange, movimentacao }: Ed
     onOpenChange(false);
   };
 
-  const pessoa = movimentacao ? ('pessoa' in movimentacao ? movimentacao.pessoa : movimentacao.pessoa) : null;
+  // Get pessoa using type guard
+  const getPessoa = (): PessoaDentro['pessoa'] | MovimentacaoComPessoa['pessoa'] | null => {
+    if (!movimentacao) return null;
+    if (isMovimentacaoComPessoa(movimentacao)) {
+      return movimentacao.pessoa;
+    }
+    return movimentacao.pessoa;
+  };
+
+  // Get movimentacaoId using type guard
+  const getMovimentacaoId = (): string => {
+    if (!movimentacao) return '';
+    if (isMovimentacaoComPessoa(movimentacao)) {
+      return movimentacao.id;
+    }
+    return movimentacao.movimentacaoId;
+  };
+
+  const pessoa = getPessoa();
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -158,12 +201,8 @@ export function EditarMovimentacaoModal({ open, onOpenChange, movimentacao }: Ed
                 <span className="font-medium">{pessoa.nome}</span>
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                
-                
                 {pessoa.contato && <span>• Contato: {pessoa.contato}</span>}
                 {pessoa.documento && <span>• Doc: {pessoa.documento}</span>}
-
-
               </div>
             </div>
           )}
@@ -280,7 +319,7 @@ export function EditarMovimentacaoModal({ open, onOpenChange, movimentacao }: Ed
             <AlertDialogAction
               onClick={async () => {
                 if (movimentacao) {
-                  const movimentacaoId = 'movimentacaoId' in movimentacao ? movimentacao.movimentacaoId : movimentacao.id;
+                  const movimentacaoId = getMovimentacaoId();
                   await excluirMovimentacao(movimentacaoId);
                   setShowDeleteDialog(false);
                   onOpenChange(false);

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { getSupabaseClient, resetSupabaseClient } from '@/lib/supabase';
+import { getSupabaseClient } from '@/lib/supabase';
 
 /**
  * Hook para garantir a inicialização correta do Supabase
@@ -12,16 +12,6 @@ export function useSupabaseInit() {
     if (initializedRef.current) return;
     
     initializedRef.current = true;
-
-    // Forçar limpeza de instâncias antigas durante HMR
-    if (import.meta.hot) {
-      try {
-        // Resetar cliente para garantir singleton durante HMR
-        resetSupabaseClient();
-      } catch (e) {
-        // Ignorar erros de reset
-      }
-    }
 
     // Verificar se o cliente foi criado corretamente
     const client = getSupabaseClient();

@@ -10,7 +10,7 @@ import { UserTypeAvatar } from '@/lib/userTypeIcons';
 import { LogOut, Check, MessageSquare, Search, X, History, User, Phone, Car, Clock, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { validators } from '@/lib/validation';
+import { validators, formatters } from '@/lib/validation';
 
 interface RegistrarSaidaEmLoteModalProps {
   open: boolean;
@@ -115,6 +115,12 @@ export function RegistrarSaidaEmLoteModal({ open, onOpenChange, pessoasDentro }:
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Saída em Lote</DialogTitle>
+          <DialogDescription>
+            Registre a saída de múltiplas pessoas da marina
+          </DialogDescription>
+        </DialogHeader>
 
         <div className="space-y-4">
           {/* Campo de pesquisa */}
@@ -182,7 +188,7 @@ export function RegistrarSaidaEmLoteModal({ open, onOpenChange, pessoasDentro }:
                           <p className="text-xs text-muted-foreground font-semibold mb-1">Placa</p>
                           {item.pessoa.placa ? (
                             <span className="font-mono bg-muted px-2 py-0.5 rounded text-xs">
-                              {item.pessoa.placa}
+                              {formatters.placa(item.pessoa.placa)}
                             </span>
                           ) : (
                             <span className="text-muted-foreground text-xs">—</span>
@@ -299,6 +305,12 @@ export function RegistrarSaidaEmLoteModal({ open, onOpenChange, pessoasDentro }:
         }
       }}>
         <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirmar Saída</DialogTitle>
+            <DialogDescription>
+              Configure o horário e observação para a saída
+            </DialogDescription>
+          </DialogHeader>
 
           {confirmandoSaida && (
             <div className="space-y-4">
@@ -324,7 +336,7 @@ export function RegistrarSaidaEmLoteModal({ open, onOpenChange, pessoasDentro }:
                   {confirmandoSaida.pessoa.placa && (
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Car className="h-3.5 w-3.5" />
-                      {confirmandoSaida.pessoa.placa}
+                      {formatters.placa(confirmandoSaida.pessoa.placa)}
                     </div>
                   )}
                 </div>

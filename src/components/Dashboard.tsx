@@ -5,6 +5,7 @@ import { Header } from '@/components/Header';
 import { Button } from '@/components/ui/button';
 import { SaidaAutomaticaButton } from '@/components/ui/SaidaAutomaticaButton';
 import { EditarPessoaModal } from '@/components/modals/EditarPessoaModal';
+import { EditarMovimentacaoModal } from '@/components/modals/EditarMovimentacaoModal';
 import { RegistrarEntradaModal } from '@/components/modals/RegistrarEntradaModal';
 import { CadastrarPessoaModal } from '@/components/modals/CadastrarPessoaModal';
 import { RegistrarSaidaPersonalizadaModal } from '@/components/modals/RegistrarSaidaPersonalizadaModal';
@@ -30,6 +31,7 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PessoaDentro } from '@/types/marina';
+import { formatters } from '@/lib/validation';
 import {
   Pagination,
   PaginationContent,
@@ -55,6 +57,7 @@ export function Dashboard() {
   const [pessoaPreSelecionada, setPessoaPreSelecionada] = useState<string | null>(null);
   const [nomePreenchidoCadastro, setNomePreenchidoCadastro] = useState<string>('');
   const [editandoPessoa, setEditandoPessoa] = useState<Pessoa | null>(null);
+  const [editandoMovimentacao, setEditandoMovimentacao] = useState<PessoaDentro | null>(null);
   const [saidaModal, setSaidaModal] = useState<{ open: boolean; pessoa: PessoaDentro | null }>({
     open: false,
     pessoa: null,
@@ -307,7 +310,7 @@ export function Dashboard() {
                               <div className="flex items-center justify-center gap-2 text-sm">
                                 <Car className="h-3.5 w-3.5 text-black" />
                                 <span className="font-mono bg-muted px-2 py-0.5 rounded text-xs">
-                                  {item.pessoa.placa}
+                                  {formatters.placa(item.pessoa.placa)}
                                 </span>
                               </div>
                             ) : (
@@ -341,7 +344,7 @@ export function Dashboard() {
                                 variant="outline"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setEditandoPessoa(item.pessoa);
+                                  setEditandoMovimentacao(item);
                                 }}
                                 className="gap-1.5"
                               >
@@ -486,6 +489,11 @@ export function Dashboard() {
         open={showSaidaLote}
         onOpenChange={setShowSaidaLote}
         pessoasDentro={pessoasDentro}
+      />
+      <EditarMovimentacaoModal
+        open={editandoMovimentacao !== null}
+        onOpenChange={(open) => !open && setEditandoMovimentacao(null)}
+        movimentacao={editandoMovimentacao}
       />
 
       {/* Botão flutuante para rolar até o topo */}

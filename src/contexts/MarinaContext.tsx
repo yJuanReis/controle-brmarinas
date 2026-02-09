@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth, UserProfile } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { validators } from '@/lib/validation';
+import { marinaService } from '@/services/marinaService';
 
 interface MarinaContextType {
   // Auth state (from useAuth)
@@ -31,6 +32,8 @@ interface MarinaContextType {
   // Movimentação actions
   registrarEntrada: (pessoaId: string, observacao?: string) => Promise<{ success: boolean; error?: string }>;
   registrarSaida: (movimentacaoId: string, saidaEm?: string, observacao?: string) => Promise<{ success: boolean; error?: string }>;
+  atualizarMovimentacao: (movimentacaoId: string, data: { entrada_em: string; saida_em?: string; observacao?: string }) => Promise<void>;
+  excluirMovimentacao: (movimentacaoId: string) => Promise<void>;
 
   // User management actions
   adicionarUsuario: (data: { nome: string; email: string; senha: string; empresa_id: string; role?: 'user' | 'admin' | 'owner' }) => Promise<void>;
@@ -86,25 +89,17 @@ export function MarinaProvider({ children }: { children: ReactNode }) {
       try {
         const empresaId = authUser.profile.empresa_id;
 
-
-        // Load pessoas and movimentacoes in parallel
-        const [pessoasResult, movimentacoesResult] = await Promise.all([
-          supabase.from('pessoas').select('*'),
-          supabase.from('movimentacoes').select('*').eq('empresa_id', empresaId)
+        // Load pessoas and movimentacoes using RPC with pagination to bypass 1000 record limit
+        const [pessoasData, movimentacoesData] = await Promise.all([
+          marinaService.getPessoasPorEmpresa(empresaId),
+          marinaService.getMovimentacoesPorEmpresa(empresaId)
         ]);
 
-        if (pessoasResult.error) {
-          // Não lançar erro, apenas logar
-        }
-        if (movimentacoesResult.error) {
-          // Não lançar erro, apenas logar
-        }
-
-        setPessoas(pessoasResult.data || []);
-        setMovimentacoes(movimentacoesResult.data || []);
+        setPessoas(pessoasData);
+        setMovimentacoes(movimentacoesData);
 
       } catch (error) {
-        // Não mostrar toast de erro para evitar spam
+        console.error('[MarinaContext] Erro ao carregar dados:', error);
       } finally {
         setBusinessLoading(false);
       }
@@ -394,6 +389,86 @@ export function MarinaProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       toast.error('Erro ao registrar saída');
       return { success: false, error: 'Erro interno' };
+    }
+  }, [movimentacoes, pessoas]);
+
+  // Atualizar movimentação (entrada, saída, observação)
+  const atualizarMovimentacao = useCallback(async (
+    movimentacaoId: string,
+    data: { entrada_em: string; saida_em?: string; observacao?: string }
+  ): Promise<void> => {
+    try {
+      const movimentacao = movimentacoes.find(m => m.id === movimentacaoId);
+
+      if (!movimentacao) {
+        throw new Error('Movimentação não encontrada');
+      }
+
+      const updateData: any = {
+        entrada_em: data.entrada_em,
+      };
+
+      // Se houver saída definida, atualizar status e saida_em
+      if (data.saida_em) {
+        updateData.saida_em = data.saida_em;
+        updateData.status = 'FORA';
+      } else {
+        // Se não há saída, manter status atual
+        updateData.status = movimentacao.status;
+      }
+
+      // Atualizar observação
+      if (data.observacao !== undefined) {
+        updateData.observacao = data.observacao;
+      }
+
+      const { data: movimentacaoAtualizada, error } = await supabase
+        .from('movimentacoes')
+        .update(updateData)
+        .eq('id', movimentacaoId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setMovimentacoes(prev => prev.map(m =>
+        m.id === movimentacaoId ? movimentacaoAtualizada : m
+      ));
+
+      toast.success('Movimentação atualizada com sucesso!');
+    } catch (err) {
+      toast.error('Erro ao atualizar movimentação');
+      throw err;
+    }
+  }, [movimentacoes]);
+
+  // Excluir movimentação (soft delete - registra excluido_em)
+  const excluirMovimentacao = useCallback(async (movimentacaoId: string): Promise<void> => {
+    try {
+      const movimentacao = movimentacoes.find(m => m.id === movimentacaoId);
+
+      if (!movimentacao) {
+        throw new Error('Movimentação não encontrada');
+      }
+
+      const { data: movimentacaoExcluida, error } = await supabase
+        .from('movimentacoes')
+        .update({ excluido_em: new Date().toISOString() })
+        .eq('id', movimentacaoId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setMovimentacoes(prev => prev.map(m =>
+        m.id === movimentacaoId ? movimentacaoExcluida : m
+      ));
+
+      const pessoa = pessoas.find(p => p.id === movimentacao.pessoa_id);
+      toast.success('Movimentação excluída com sucesso!');
+    } catch (err) {
+      toast.error('Erro ao excluir movimentação');
+      throw err;
     }
   }, [movimentacoes, pessoas]);
 
@@ -843,6 +918,8 @@ export function MarinaProvider({ children }: { children: ReactNode }) {
     excluirPessoa,
     registrarEntrada,
     registrarSaida,
+    atualizarMovimentacao,
+    excluirMovimentacao,
     adicionarUsuario,
     removerUsuario,
     alterarSenhaUsuario,
@@ -873,6 +950,8 @@ export function MarinaProvider({ children }: { children: ReactNode }) {
     excluirPessoa,
     registrarEntrada,
     registrarSaida,
+    atualizarMovimentacao,
+    excluirMovimentacao,
     adicionarUsuario,
     removerUsuario,
     alterarSenhaUsuario,

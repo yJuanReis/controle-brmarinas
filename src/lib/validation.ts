@@ -184,3 +184,5 @@ export function formatPlaca(value: string): string {
 
 // Exporta o objeto validators para compatibilidade
 export { validators } from './validation/validators';
+// Exporta o objeto formatters para compatibilidade
+export { formatters } from './validation/formatters';

@@ -5,9 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { EditarPessoaModal } from '@/components/modals/EditarPessoaModal';
+import { EditarMovimentacaoModal } from '@/components/modals/EditarMovimentacaoModal';
 import { RegistrarSaidaPersonalizadaModal } from '@/components/modals/RegistrarSaidaPersonalizadaModal';
+import { MovimentacaoComPessoa } from '@/types/marina';
 import { UserTypeIcon, UserTypeAvatar } from '@/lib/userTypeIcons';
-import { Pessoa, MovimentacaoComPessoa, PessoaDentro } from '@/types/marina';
+import { Pessoa, PessoaDentro } from '@/types/marina';
 import {
   Pagination,
   PaginationContent,
@@ -46,6 +48,7 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { formatters } from '@/lib/validation';
 
 export function HistoricoPage() {
   const { getHistoricoMovimentacoes } = useMarina();
@@ -70,6 +73,7 @@ export function HistoricoPage() {
   });
 
   const [editandoPessoa, setEditandoPessoa] = useState<Pessoa | null>(null);
+  const [editandoMovimentacao, setEditandoMovimentacao] = useState<MovimentacaoComPessoa | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'daily'>('list');
   const [saidaModal, setSaidaModal] = useState<{ open: boolean; pessoa: PessoaDentro | null }>({
     open: false,
@@ -631,7 +635,7 @@ export function HistoricoPage() {
                                       <div className="flex items-center gap-2">
                                         <Car className="h-3 w-3 text-black" />
                                         <span className="font-mono bg-muted px-2 py-0.5 rounded text-xs">
-                                          {mov.pessoa.placa}
+                                          {formatters.placa(mov.pessoa.placa)}
                                         </span>
                                       </div>
                                     )}
@@ -858,7 +862,7 @@ export function HistoricoPage() {
                                   <div className="flex items-center gap-2 text-sm">
                                     <Car className="h-3.5 w-3.5 text-black" />
                                     <span className="font-mono bg-muted px-2 py-0.5 rounded text-xs">
-                                      {mov.pessoa.placa}
+                                      {formatters.placa(mov.pessoa.placa)}
                                     </span>
                                   </div>
                                 ) : (
@@ -917,7 +921,7 @@ export function HistoricoPage() {
                                     variant="outline"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      setEditandoPessoa(mov.pessoa);
+                                      setEditandoMovimentacao(mov);
                                     }}
                                     className="gap-1.5"
                                   >
@@ -1030,6 +1034,11 @@ export function HistoricoPage() {
         open={saidaModal.open}
         onOpenChange={(open) => setSaidaModal({ open, pessoa: saidaModal.pessoa })}
         pessoaDentro={saidaModal.pessoa}
+      />
+      <EditarMovimentacaoModal
+        open={editandoMovimentacao !== null}
+        onOpenChange={(open) => !open && setEditandoMovimentacao(null)}
+        movimentacao={editandoMovimentacao}
       />
 
       {/* Botão flutuante para rolar até o topo */}

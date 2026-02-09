@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import { UserTypeAvatar } from '@/lib/userTypeIcons';
 import { validateCPF, validateRG, validatePlaca } from '@/lib/validation';
 import { smartSearch } from '@/lib/utils';
-import { validators } from '@/lib/validation';
+import { validators, formatters } from '@/lib/validation';
 
 type TipoPessoa = 'cliente' | 'visita' | 'marinheiro' | 'proprietario' | 'colaborador' | 'prestador' | '';
 
@@ -167,8 +167,12 @@ export function RegistrarEntradaModal({
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-6xl h-[90vh] max-h-[900px] flex flex-col p-0 overflow-hidden bg-slate-50 gap-0" hideCloseButton>
-        
-        {/* Header Visual do Modal (Opcional, remove a borda padrão do DialogContent) */}
+        <DialogHeader>
+          <DialogTitle>Registrar Entrada</DialogTitle>
+          <DialogDescription>
+            Selecione uma pessoa para registrar sua entrada na marina
+          </DialogDescription>
+        </DialogHeader>
 
         <div className="flex-1 flex flex-col lg:flex-row min-h-0">
           {/* LADO ESQUERDO: LISTA E BUSCA */}
@@ -248,7 +252,7 @@ onClick={() => handleSelectPessoa(pessoa.id)}
                           {pessoa.placa && (
                             <>
                               <span className="w-1 h-1 rounded-full bg-slate-300" />
-                              <span className="font-mono bg-slate-100 px-1 rounded">{pessoa.placa}</span>
+                              <span className="font-mono bg-slate-100 px-1 rounded">{formatters.placa(pessoa.placa)}</span>
                             </>
                           )}
                         </div>

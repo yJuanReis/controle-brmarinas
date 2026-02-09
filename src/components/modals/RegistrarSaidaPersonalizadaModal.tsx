@@ -9,6 +9,7 @@ import { LogOut, User, Clock, Car, Phone, FileText } from 'lucide-react';
 import { PessoaDentro } from '@/types/marina';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { formatters } from '@/lib/validation';
 
 interface RegistrarSaidaPersonalizadaModalProps {
   open: boolean;
@@ -71,6 +72,12 @@ export function RegistrarSaidaPersonalizadaModal({ open, onOpenChange, pessoaDen
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Registrar Saída Personalizada</DialogTitle>
+          <DialogDescription>
+            Configure o horário e observação para a saída
+          </DialogDescription>
+        </DialogHeader>
 
         <div className="space-y-4">
           {/* Person info */}
@@ -95,7 +102,7 @@ export function RegistrarSaidaPersonalizadaModal({ open, onOpenChange, pessoaDen
               {pessoa.placa && (
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Car className="h-3.5 w-3.5" />
-                  {pessoa.placa}
+                  {formatters.placa(pessoa.placa)}
                 </div>
               )}
             </div>

@@ -6,7 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useMarina } from '@/contexts/MarinaContext';
+import { marinaService } from '@/services/marinaService';
 import { Calendar, Download, FileText, FileSpreadsheet, FileText as FileTextIcon, File, Download as DownloadIcon } from 'lucide-react';
 import { format, startOfDay, endOfDay, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -69,18 +71,8 @@ const getAvailableYears = () => {
   return Array.from({ length: 6 }, (_, index) => currentYear - index);
 };
 
-// Função para combinar data e hora corretamente usando timezone local
-const combinarDataHora = (dataStr: string, horaStr: string): Date => {
-  // Parse manual para evitar problemas de timezone
-  const [ano, mes, dia] = dataStr.split('-').map(Number);
-  const [horas, minutos] = horaStr.split(':').map(Number);
-  
-  // Criar data com timezone local (não UTC)
-  return new Date(ano, mes - 1, dia, horas, minutos, 0, 0);
-};
-
 export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
-  const { user, empresas, movimentacoes, pessoas, empresaAtual: empresaContext } = useMarina();
+  const { user, empresas, pessoas, empresaAtual: empresaContext } = useMarina();
   
   // Valores iniciais: range do mês atual ao abrir o modal
   const getInitialFiltros = () => {
@@ -92,6 +84,7 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isMonthFilter, setIsMonthFilter] = useState(false);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [incluirExcluidas, setIncluirExcluidas] = useState(false);
 
   // Resetar filtros quando o modal abre
   useEffect(() => {
@@ -110,51 +103,27 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
     setIsLoading(true);
 
     try {
-      // Filtrar movimentações da empresa do usuário
-      let movimentacoesFiltradas = movimentacoes.filter(m => m.empresa_id === empresaAtual.id);
+      // Preparar parâmetros de data para a RPC
+      let dataInicioStr: string;
+      let dataFimStr: string;
 
-
-      // Aplicar filtros combinando data e hora corretamente
-      // Quando estiver usando filtro de mês completo, ignorar os filtros de hora
-      if (!isMonthFilter && filtros.dataInicio && filtros.horaInicio) {
-        const dataHoraInicio = combinarDataHora(filtros.dataInicio, filtros.horaInicio);
-        
-        movimentacoesFiltradas = movimentacoesFiltradas.filter(m => {
-          const entrada = new Date(m.entrada_em);
-          return entrada >= dataHoraInicio;
-        });
-        
+      if (isMonthFilter && filtros.dataInicio && filtros.dataFim) {
+        // Filtro de mês completo: usar o dia inteiro
+        dataInicioStr = `${filtros.dataInicio}T00:00:00`;
+        dataFimStr = `${filtros.dataFim}T23:59:59`;
+      } else {
+        // Usar data e hora selecionadas
+        dataInicioStr = `${filtros.dataInicio}T${filtros.horaInicio}:00`;
+        dataFimStr = `${filtros.dataFim}T${filtros.horaFim}:59`;
       }
 
-      if (!isMonthFilter && filtros.dataFim && filtros.horaFim) {
-        const dataHoraFim = combinarDataHora(filtros.dataFim, filtros.horaFim);
-        // Adicionar 59 segundos e 999ms para pegar até o último segundo da hora especificada
-        dataHoraFim.setSeconds(59, 999);
-        
-        movimentacoesFiltradas = movimentacoesFiltradas.filter(m => {
-          const entrada = new Date(m.entrada_em);
-          return entrada <= dataHoraFim;
-        });
-        
-      }
-
-      // Quando estiver usando filtro de mês completo, aplicar filtro apenas por data (todo o dia)
-      if (isMonthFilter && filtros.dataInicio) {
-        const dataInicio = new Date(filtros.dataInicio);
-        const dataFim = new Date(filtros.dataFim);
-        
-        
-        // Definir início do dia (00:00:00)
-        dataInicio.setHours(0, 0, 0, 0);
-        // Definir fim do dia (23:59:59)
-        dataFim.setHours(23, 59, 59, 999);
-        
-        movimentacoesFiltradas = movimentacoesFiltradas.filter(m => {
-          const entrada = new Date(m.entrada_em);
-          return entrada >= dataInicio && entrada <= dataFim;
-        });
-        
-      }
+      // Buscar movimentações via RPC (contorna limite de 1000 registros)
+      const movimentacoesFiltradas = await marinaService.getMovimentacoesPorPeriodo(
+        empresaAtual.id,
+        dataInicioStr,
+        dataFimStr,
+        incluirExcluidas
+      );
 
       // Ordenar por data (mais recente primeiro)
       movimentacoesFiltradas.sort((a, b) => new Date(b.entrada_em).getTime() - new Date(a.entrada_em).getTime());
@@ -209,8 +178,6 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
       }
 
       toast.success(`Relatório gerado com ${dadosExportacao.length} registro(s)!`);
-
-      toast.error('Erro ao gerar relatório. Verifique o console para mais detalhes.');
     } finally {
       setIsLoading(false);
     }
@@ -458,6 +425,7 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
                               size="sm"
                               className="group hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 border border-transparent hover:border-blue-200 hover:shadow-sm hover:scale-105"
                               onClick={() => {
+                                // Usar o ano que está sendo exibido no seletor (selectedYear)
                                 const mesRange = getMonthRange(index, selectedYear);
                                 setFiltros(mesRange);
                                 setIsMonthFilter(true);
@@ -539,43 +507,61 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="mydict">
-                <div>
-                  <label>
-                    <input 
-                      type="radio" 
-                      name="formato" 
-                      checked={formato === 'pdf'}
-                      onChange={() => setFormato('pdf')}
-                    />
-                    <span>PDF</span>
-                  </label>
-                  <label>
-                    <input 
-                      type="radio" 
-                      name="formato" 
-                      checked={formato === 'xlsx'}
-                      onChange={() => setFormato('xlsx')}
-                    />
-                    <span>Excel</span>
-                  </label>
-                  <label>
-                    <input 
-                      type="radio" 
-                      name="formato" 
-                      checked={formato === 'csv'}
-                      onChange={() => setFormato('csv')}
-                    />
-                    <span>CSV</span>
-                  </label>
-                  <label>
-                    <input 
-                      type="radio" 
-                      name="formato" 
-                      checked={formato === 'txt'}
-                      onChange={() => setFormato('txt')}
-                    />
-                    <span>TXT</span>
+              <div className="space-y-4">
+                <div className="mydict">
+                  <div>
+                    <label>
+                      <input 
+                        type="radio" 
+                        name="formato" 
+                        checked={formato === 'pdf'}
+                        onChange={() => setFormato('pdf')}
+                      />
+                      <span>PDF</span>
+                    </label>
+                    <label>
+                      <input 
+                        type="radio" 
+                        name="formato" 
+                        checked={formato === 'xlsx'}
+                        onChange={() => setFormato('xlsx')}
+                      />
+                      <span>Excel</span>
+                    </label>
+                    <label>
+                      <input 
+                        type="radio" 
+                        name="formato" 
+                        checked={formato === 'csv'}
+                        onChange={() => setFormato('csv')}
+                      />
+                      <span>CSV</span>
+                    </label>
+                    <label>
+                      <input 
+                        type="radio" 
+                        name="formato" 
+                        checked={formato === 'txt'}
+                        onChange={() => setFormato('txt')}
+                      />
+                      <span>TXT</span>
+                    </label>
+                  </div>
+                </div>
+                
+                {/* Opção para incluir movimentações excluídas */}
+                <div className="flex items-center space-x-3 pt-4 border-t border-gray-100">
+                  <Checkbox
+                    id="incluirExcluidas"
+                    checked={incluirExcluidas}
+                    onCheckedChange={(checked) => setIncluirExcluidas(checked as boolean)}
+                  />
+                  <label
+                    htmlFor="incluirExcluidas"
+                    className="text-sm font-medium text-gray-700 cursor-pointer flex items-center gap-2"
+                  >
+                    <span>Incluir movimentações excluídas</span>
+                    <span className="text-xs text-muted-foreground">(registradas como excluido_em)</span>
                   </label>
                 </div>
               </div>

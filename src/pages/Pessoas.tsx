@@ -17,6 +17,7 @@ import { ExcluirPessoaModal } from '@/components/modals/ExcluirPessoaModal';
 import { Pessoa } from '@/types/marina';
 import { UserTypeAvatar } from '@/lib/userTypeIcons';
 import { smartSearch } from '@/lib/utils';
+import { formatters } from '@/lib/validation';
 import {
   Users,
   Search,
@@ -238,7 +239,7 @@ export function PessoasPage() {
                       <Car className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                       <span className="text-muted-foreground">Placa:</span>
                       <span className="font-mono bg-muted px-2 py-0.5 rounded text-xs font-medium text-foreground">
-                        {pessoa.placa}
+                        {formatters.placa(pessoa.placa)}
                       </span>
                     </div>
                   )}

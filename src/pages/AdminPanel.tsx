@@ -294,7 +294,8 @@ export function AdminPanel() {
                       <p className="text-sm font-medium text-orange-600">Movimentações Hoje</p>
                       <p className="text-3xl font-bold text-orange-900">
                         {movimentacoes.filter(m =>
-                          m.empresa_id === user?.empresa_id &&
+                          // Owner vê todas as empresas, outros usuários veem só a deles
+                          (user?.role === 'owner' || m.empresa_id === user?.empresa_id) &&
                           new Date(m.entrada_em).toDateString() === new Date().toDateString()
                         ).length}
                       </p>

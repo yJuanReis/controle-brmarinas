@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { Movimentacao, PessoaDentro } from '@/types/marina';
+import { Movimentacao, PessoaDentro, Pessoa } from '@/types/marina';
 
 /**
  * Serviço de gerenciamento de marina com funções de saída automática
@@ -268,6 +268,173 @@ export class MarinaService {
         tempoMedio: Math.floor(tempoMedio / (1000 * 60 * 60)) // Em horas
       };
     } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Busca todas as movimentações de uma empresa com paginação
+   * Contorna o limite de 1000 registros do Supabase
+   * @param empresaId ID da empresa
+   * @returns Lista de todas as movimentações
+   */
+  public async getMovimentacoesPorEmpresa(empresaId: string): Promise<Movimentacao[]> {
+    try {
+      console.log(`[MarinaService] Buscando todas as movimentações via RPC para empresa ${empresaId}`);
+
+      const BATCH_SIZE = 1000;
+      let offset = 0;
+      let todasMovimentacoes: Movimentacao[] = [];
+      let temMaisRegistros = true;
+
+      // Fazer requisições sequenciais até não haver mais registros
+      while (temMaisRegistros) {
+        const { data, error } = await supabase
+          .rpc('get_movimentacoes_por_empresa', {
+            p_empresa_id: empresaId,
+            p_limit: BATCH_SIZE,
+            p_offset: offset
+          });
+
+        if (error) {
+          console.error('[MarinaService] Erro ao buscar movimentações via RPC:', JSON.stringify(error, null, 2));
+          throw error;
+        }
+
+        const batch = data || [];
+        console.log(`[MarinaService] Batch movimentações offset ${offset}: ${batch.length} registros`);
+
+        if (batch.length === 0 || batch.length < BATCH_SIZE) {
+          todasMovimentacoes = [...todasMovimentacoes, ...batch];
+          temMaisRegistros = false;
+        } else {
+          todasMovimentacoes = [...todasMovimentacoes, ...batch];
+          offset += BATCH_SIZE;
+        }
+      }
+
+      console.log(`[MarinaService] Total de movimentações encontradas: ${todasMovimentacoes.length}`);
+      return todasMovimentacoes;
+    } catch (error) {
+      console.error('[MarinaService] Erro ao buscar movimentações por empresa:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Busca movimentações por período usando RPC com paginação
+   * Esta função contorna o limite de 1000 registros do Supabase
+   * fazendo múltiplas requisições até buscar todos os registros
+   * @param empresaId ID da empresa
+   * @param dataInicio Data/hora de início do período
+   * @param dataFim Data/hora de fim do período
+   * @param incluirExcluidas Se true, inclui movimentações marcadas como excluídas
+   * @returns Lista de movimentações no período
+   */
+  public async getMovimentacoesPorPeriodo(
+    empresaId: string,
+    dataInicio: string,
+    dataFim: string,
+    incluirExcluidas: boolean = false
+  ): Promise<Movimentacao[]> {
+    try {
+      console.log(`[MarinaService] Buscando movimentações via RPC para empresa ${empresaId}`);
+      console.log(`[MarinaService] Período: ${dataInicio} até ${dataFim}`);
+
+      const BATCH_SIZE = 1000;
+      let offset = 0;
+      let todasMovimentacoes: Movimentacao[] = [];
+      let temMaisRegistros = true;
+
+      // Fazer requisições sequenciais até não haver mais registros
+      while (temMaisRegistros) {
+        const { data, error } = await supabase
+          .rpc('get_movimentacoes_por_periodo', {
+            p_empresa_id: empresaId,
+            p_data_inicio: dataInicio,
+            p_data_fim: dataFim,
+            p_limit: BATCH_SIZE,
+            p_offset: offset
+          });
+
+        if (error) {
+          console.error('[MarinaService] Erro ao buscar movimentações via RPC:', JSON.stringify(error, null, 2));
+          throw error;
+        }
+
+        const batch = data || [];
+        console.log(`[MarinaService] Batch offset ${offset}: ${batch.length} registros`);
+
+        if (batch.length === 0 || batch.length < BATCH_SIZE) {
+          // último batch ou结果 vazio
+          todasMovimentacoes = [...todasMovimentacoes, ...batch];
+          temMaisRegistros = false;
+        } else {
+          // Há mais registros para buscar
+          todasMovimentacoes = [...todasMovimentacoes, ...batch];
+          offset += BATCH_SIZE;
+        }
+      }
+
+      // Se não devemos incluir excluídas, filtrar
+      let movimentacoes = todasMovimentacoes;
+      if (!incluirExcluidas) {
+        movimentacoes = movimentacoes.filter((m: Movimentacao) => !m.excluido_em);
+      }
+
+      console.log(`[MarinaService] Total de movimentações encontradas: ${movimentacoes.length}`);
+      return movimentacoes;
+    } catch (error) {
+      console.error('[MarinaService] Erro ao buscar movimentações por período:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Busca todas as pessoas de uma empresa usando paginação
+   * Contorna o limite de 1000 registros do Supabase
+   * @param empresaId ID da empresa
+   * @returns Lista de todas as pessoas
+   */
+  public async getPessoasPorEmpresa(empresaId: string): Promise<Pessoa[]> {
+    try {
+      console.log(`[MarinaService] Buscando todas as pessoas via RPC para empresa ${empresaId}`);
+
+      const BATCH_SIZE = 1000;
+      let offset = 0;
+      let todasPessoas: Pessoa[] = [];
+      let temMaisRegistros = true;
+
+      // Fazer requisições sequenciais até não haver mais registros
+      while (temMaisRegistros) {
+        const { data, error } = await supabase
+          .rpc('get_pessoas_por_empresa', {
+            p_empresa_id: empresaId,
+            p_limit: BATCH_SIZE,
+            p_offset: offset
+          });
+
+        if (error) {
+          console.error('[MarinaService] Erro ao buscar pessoas via RPC:', JSON.stringify(error, null, 2));
+          throw error;
+        }
+
+        const batch = data || [];
+        console.log(`[MarinaService] Batch pessoas offset ${offset}: ${batch.length} registros`);
+
+        if (batch.length === 0 || batch.length < BATCH_SIZE) {
+          todasPessoas = [...todasPessoas, ...batch];
+          temMaisRegistros = false;
+        } else {
+          todasPessoas = [...todasPessoas, ...batch];
+          offset += BATCH_SIZE;
+        }
+      }
+
+      console.log(`[MarinaService] Total de pessoas encontradas: ${todasPessoas.length}`);
+      return todasPessoas;
+    } catch (error) {
+      console.error('[MarinaService] Erro ao buscar pessoas por empresa:', error);
       throw error;
     }
   }

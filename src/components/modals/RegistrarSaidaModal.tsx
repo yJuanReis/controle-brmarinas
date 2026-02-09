@@ -7,7 +7,7 @@ import { PessoaDentro } from '@/types/marina';
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { validators } from '@/lib/validation';
+import { validators, formatters } from '@/lib/validation';
 
 interface RegistrarSaidaModalProps {
   open: boolean;
@@ -94,7 +94,7 @@ export function RegistrarSaidaModal({ open, onOpenChange, pessoaDentro }: Regist
               {pessoa.placa && (
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Car className="h-4 w-4" />
-                  <span className="font-mono bg-muted px-2 py-1 rounded">{pessoa.placa}</span>
+                  <span className="font-mono bg-muted px-2 py-1 rounded">{formatters.placa(pessoa.placa)}</span>
                 </div>
               )}
             </div>

@@ -108,50 +108,32 @@ export function PessoasPage() {
 
       <main className="container mx-auto px-4 py-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div>
-            <h2 className="text-2xl font-display font-bold text-foreground mb-1 flex items-center gap-2">
-              <Users className="h-6 w-6 text-primary" />
-              Pessoas Cadastradas
-            </h2>
-            <p className="text-muted-foreground">
-              {pessoasFiltradas.length} de {pessoas.length} pessoa{pessoas.length !== 1 ? 's' : ''}
-            </p>
-          </div>
-          <Button 
-            onClick={() => setShowCadastrar(true)}
-            size="lg"
-            className="gap-2 bg-orange-500 hover:bg-orange-600 px-6 py-4 text-base h-auto"
-          >
-            <UserPlus className="h-5 w-5" />
-            <div className="text-left">
-              <div className="font-semibold">Cadastrar Pessoa</div>
-              <div className="text-xs opacity-75">Adicionar nova pessoa</div>
-            </div>
-          </Button>
-        </div>
+
 
         {/* Search and Filters */}
         <div className="card-elevated p-5 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-medium flex items-center gap-2">
-              <Search className="h-4 w-4 text-muted-foreground" />
-              Filtrar pessoas
-            </h3>
-            {(searchTerm || tipoFiltro !== 'all') && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setSearchTerm('');
-                  setTipoFiltro('all');
-                }}
-                className="text-muted-foreground gap-1.5"
-              >
-                <X className="h-4 w-4" />
-                Limpar filtros
-              </Button>
-            )}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+            <div>
+              <h2 className="text-2xl font-display font-bold text-foreground mb-1 flex items-center gap-2">
+                <Users className="h-6 w-6 text-primary" />
+                Pessoas Cadastradas
+              </h2>
+              <p className="text-muted-foreground">
+                {pessoasFiltradas.length} de {pessoas.length} pessoa{pessoas.length !== 1 ? 's' : ''}
+              </p>
+            </div>
+
+            <Button 
+              onClick={() => setShowCadastrar(true)}
+              size="lg"
+              className="gap-2 bg-orange-500 hover:bg-orange-600 px-6 py-4 text-base h-auto"
+            >
+              <UserPlus className="h-5 w-5" />
+              <div className="text-left">
+                <div className="font-semibold">Cadastrar Pessoa</div>
+                <div className="text-xs opacity-75">Adicionar nova pessoa</div>
+              </div>
+            </Button>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -190,6 +172,23 @@ export function PessoasPage() {
               </Select>
             </div>
           </div>
+
+          <div className="flex items-center justify-end mt-4">
+            {(searchTerm || tipoFiltro !== 'all') && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSearchTerm('');
+                  setTipoFiltro('all');
+                }}
+                className="text-muted-foreground gap-1.5"
+              >
+                <X className="h-4 w-4" />
+                Limpar filtros
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Content */}
@@ -205,7 +204,7 @@ export function PessoasPage() {
           </div>
         ) : (
           <>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-2">
                 {pessoasPaginadas.map((pessoa) => (
                   <div 
                     key={pessoa.id}

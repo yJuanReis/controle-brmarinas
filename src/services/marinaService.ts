@@ -18,6 +18,7 @@ export class MarinaService {
 
   /**
    * Executa saída automática para todas as pessoas que ultrapassaram o tempo limite
+   * VERSÃO OTIMIZADA com bulk operations para melhor performance
    * @param empresaId ID da empresa
    * @param tempoLimiteHoras Tempo limite em horas (padrão: 8 horas)
    * @returns Quantidade de pessoas que tiveram saída registrada automaticamente
@@ -26,10 +27,11 @@ export class MarinaService {
     try {
       console.log(`[MarinaService] Executando saída automática para empresa ${empresaId} com limite de ${tempoLimiteHoras} horas`);
 
-      // Obter todas as movimentações ativas (pessoas dentro) da empresa
+      // Obter TODAS as movimentações ativas da empresa (com índice otimizado)
+      // Nota: Para escalas muito grandes, considere paginar esta query
       const { data: movimentacoesAtivas, error } = await supabase
         .from('movimentacoes')
-        .select('*')
+        .select('id, entrada_em, observacao')
         .eq('empresa_id', empresaId)
         .eq('status', 'DENTRO');
 
@@ -38,107 +40,63 @@ export class MarinaService {
         throw error;
       }
 
-      console.log(`[MarinaService] Movimentações ativas encontradas: ${movimentacoesAtivas?.length || 0}`);
+      const count = movimentacoesAtivas?.length || 0;
+      console.log(`[MarinaService] Movimentações ativas encontradas: ${count}`);
 
-      if (!movimentacoesAtivas || movimentacoesAtivas.length === 0) {
-        console.log('[MarinaService] Nenhuma movimentação ativa encontrada');
+      if (count === 0) {
         return 0;
       }
 
-      const tempoLimiteMs = tempoLimiteHoras * 60 * 60 * 1000; // Converter horas para milissegundos
-      const agora = new Date();
-      let pessoasRemovidas = 0;
+      const tempoLimiteMs = tempoLimiteHoras * 60 * 60 * 1000;
+      const agora = new Date().toISOString();
 
-      console.log(`[MarinaService] Tempo limite em milissegundos: ${tempoLimiteMs}`);
-      console.log(`[MarinaService] Data/hora atual: ${agora.toISOString()}`);
+      // Identificar movimentações que ultrapassaram o limite
+      const movimentacoesParaSair = movimentacoesAtivas!.filter(m => {
+        const tempoDecorrido = new Date().getTime() - new Date(m.entrada_em).getTime();
+        return tempoDecorrido >= tempoLimiteMs;
+      });
 
-      // Processar cada movimentação
-      for (const movimentacao of movimentacoesAtivas) {
-        const tempoDecorrido = agora.getTime() - new Date(movimentacao.entrada_em).getTime();
-        const tempoDecorridoHoras = tempoDecorrido / (1000 * 60 * 60);
-        
-        console.log(`[MarinaService] Movimentação ${movimentacao.id}: tempo decorrido = ${tempoDecorridoHoras.toFixed(2)} horas`);
+      console.log(`[MarinaService] Movimentações que ultrapassaram limite: ${movimentacoesParaSair.length}`);
 
-        if (tempoDecorrido >= tempoLimiteMs) {
-          console.log(`[MarinaService] Movimentação ${movimentacao.id} ultrapassou o limite, registrando saída...`);
-
-          // Registrar saída automática
-          const resultado = await this.registrarSaidaAutomatica(movimentacao.id, tempoLimiteHoras);
-          
-          if (resultado.success) {
-            pessoasRemovidas++;
-            console.log(`[MarinaService] Saída registrada com sucesso para movimentação ${movimentacao.id}`);
-          } else {
-            console.error(`[MarinaService] Falha ao registrar saída para movimentação ${movimentacao.id}:`, resultado.error);
-          }
-        } else {
-          console.log(`[MarinaService] Movimentação ${movimentacao.id} ainda dentro do limite`);
-        }
+      if (movimentacoesParaSair.length === 0) {
+        return 0;
       }
 
-      console.log(`[MarinaService] Saída automática concluída. Pessoas removidas: ${pessoasRemovidas}`);
-      return pessoasRemovidas;
+      // BULK UPDATE - Atualizar todas de uma vez (MUITO mais rápido!)
+      const observacaoPadrao = `Saída automática após ${tempoLimiteHoras}h`;
+
+      const updates = movimentacoesParaSair.map(m => {
+        const observacaoOriginal = m.observacao || '';
+        const observacaoFinal = observacaoOriginal 
+          ? `${observacaoOriginal} | ${observacaoPadrao}`
+          : observacaoPadrao;
+
+        return {
+          id: m.id,
+          status: 'FORA',
+          saida_em: agora,
+          observacao: observacaoFinal
+        };
+      });
+
+      // Usar upsert para bulk update (Supabase suporta até 1000 por operação)
+      if (updates.length > 0) {
+        const { error: bulkError } = await supabase
+          .from('movimentacoes')
+          .upsert(updates, { onConflict: 'id' });
+
+        if (bulkError) {
+          console.error('[MarinaService] Erro no bulk update:', bulkError);
+          throw bulkError;
+        }
+
+        console.log(`[MarinaService] Bulk update concluído: ${updates.length} registros`);
+      }
+
+      return movimentacoesParaSair.length;
     } catch (error) {
       console.error('[MarinaService] Erro ao executar saída automática:', error);
       throw error;
-    }
-  }
-
-  /**
-   * Registra saída automática para uma movimentação específica
-   * @param movimentacaoId ID da movimentação
-   * @param tempoLimiteHoras Tempo limite que foi ultrapassado
-   * @returns Resultado da operação
-   */
-  private async registrarSaidaAutomatica(movimentacaoId: string, tempoLimiteHoras: number): Promise<{ success: boolean; error?: string }> {
-    try {
-      // Obter dados da movimentação para auditoria
-      const { data: movimentacao, error: fetchError } = await supabase
-        .from('movimentacoes')
-        .select('*, pessoas(nome, documento)')
-        .eq('id', movimentacaoId)
-        .single();
-
-      if (fetchError) {
-        throw fetchError;
-      }
-
-      if (!movimentacao) {
-        throw new Error('Movimentação não encontrada');
-      }
-
-      // Dados para auditoria
-      const pessoaNome = movimentacao.pessoas?.nome || 'Desconhecido';
-      const observacaoSaida = `Saída automática após ${tempoLimiteHoras}h`;
-      
-      // NUNCA deixar observacao vazia ou null - sempre concatenar
-      const observacaoOriginal = movimentacao.observacao || '';
-      
-      let observacaoFinal: string;
-      if (observacaoOriginal !== '') {
-        observacaoFinal = `${observacaoOriginal} | ${observacaoSaida}`;
-      } else {
-        observacaoFinal = observacaoSaida;
-      }
-
-      // Atualizar movimentação com saída automática
-      const { error: updateError } = await supabase
-        .from('movimentacoes')
-        .update({
-          status: 'FORA',
-          saida_em: new Date().toISOString(),
-          observacao: observacaoFinal
-        })
-        .eq('id', movimentacaoId);
-
-      if (updateError) {
-        throw updateError;
-      }
-
-
-      return { success: true };
-    } catch (error) {
-      return { success: false, error: error.message };
     }
   }
 
@@ -354,7 +312,8 @@ export class MarinaService {
             p_data_inicio: dataInicio,
             p_data_fim: dataFim,
             p_limit: BATCH_SIZE,
-            p_offset: offset
+            p_offset: offset,
+            p_incluir_excluidas: incluirExcluidas
           });
 
         if (error) {
@@ -376,14 +335,8 @@ export class MarinaService {
         }
       }
 
-      // Se não devemos incluir excluídas, filtrar
-      let movimentacoes = todasMovimentacoes;
-      if (!incluirExcluidas) {
-        movimentacoes = movimentacoes.filter((m: Movimentacao) => !m.excluido_em);
-      }
-
-      console.log(`[MarinaService] Total de movimentações encontradas: ${movimentacoes.length}`);
-      return movimentacoes;
+      console.log(`[MarinaService] Total de movimentações encontradas: ${todasMovimentacoes.length}`);
+      return todasMovimentacoes;
     } catch (error) {
       console.error('[MarinaService] Erro ao buscar movimentações por período:', error);
       throw error;

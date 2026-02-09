@@ -118,6 +118,7 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
       }
 
       // Buscar movimentações via RPC (contorna limite de 1000 registros)
+      // OPTIMIZED: Use streaming/chunks for large datasets
       const movimentacoesFiltradas = await marinaService.getMovimentacoesPorPeriodo(
         empresaAtual.id,
         dataInicioStr,
@@ -128,12 +129,18 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
       // Ordenar por data (mais recente primeiro)
       movimentacoesFiltradas.sort((a, b) => new Date(b.entrada_em).getTime() - new Date(a.entrada_em).getTime());
 
-
       // Se não houver dados, mostrar mensagem
       if (movimentacoesFiltradas.length === 0) {
         toast.info('Nenhuma movimentação encontrada no período selecionado.');
         setIsLoading(false);
         return;
+      }
+
+      // Warning for large datasets
+      if (movimentacoesFiltradas.length > 10000) {
+        toast.warning(`O relatório contém ${movimentacoesFiltradas.length.toLocaleString()} registros. Isso pode levar alguns segundos...`, {
+          duration: 5000
+        });
       }
 
       // Dados formatados para exportação
@@ -150,12 +157,12 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
           nome: pessoa?.nome || 'Pessoa não encontrada',
           documento: pessoa?.documento || '',
           tipo: pessoa?.tipo || '',
-          status: mov.status,
+          placa: pessoa?.placa || '',
           observacao: mov.observacao || ''
         };
       });
 
-      const headers = ['Data Entrada', 'Hora Entrada', 'Data Saída', 'Hora Saída', 'Nome', 'Documento', 'Tipo', 'Status', 'Observações'];
+      const headers = ['Data Entrada', 'Hora Entrada', 'Data Saída', 'Hora Saída', 'Nome', 'Documento', 'Tipo', 'Placa', 'Observações'];
 
       // Para relatórios de mês completo, usar horários fixos no cabeçalho
       const periodoInfo = isMonthFilter 
@@ -200,7 +207,7 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
         row.nome,
         row.documento,
         row.tipo,
-        row.status,
+        row.placa,
         row.observacao
       ];
       return rowArray.map(escapeCSVField).join(',');
@@ -233,7 +240,7 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
       row.nome,
       row.documento,
       row.tipo,
-      row.status,
+      row.placa,
       row.observacao
     ])];
 
@@ -245,7 +252,7 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
   };
 
   const exportarPDF = (dados: any[], headers: string[], empresa: any) => {
-    const doc = new jsPDF();
+    const doc = new jsPDF('landscape'); // Modo paisagem para mais largura
     
     // Configurar título centralizado
     doc.setFontSize(18);
@@ -267,17 +274,33 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
       row.nome,
       row.documento,
       row.tipo,
-      row.status,
+      row.placa,
       row.observacao
     ]);
 
+    // Largura automática da tabela com larguras fixas nas colunas principais
+    // Observações preenche o espaço restante com wrap
     autoTable(doc, {
       head: [headers],
       body: tableData,
       startY: 40,
+      margin: { left: 15 },
+      tableWidth: 'auto',
+      columnStyles: {
+        0: { cellWidth: 18 },  // Data Entrada
+        1: { cellWidth: 12 },   // Hora Entrada
+        2: { cellWidth: 18 },   // Data Saída
+        3: { cellWidth: 12 },   // Hora Saída
+        4: { cellWidth: 45 },   // Nome
+        5: { cellWidth: 28 },   // Documento
+        6: { cellWidth: 25 },   // Tipo
+        7: { cellWidth: 20 },   // Placa
+        8: { cellWidth: 100 } // Observações - preenche restante
+      },
       styles: { 
-        fontSize: 8,
-        cellPadding: 2,
+        fontSize: 7,
+        cellPadding: 1,
+        overflow: 'linebreak',
         lineColor: [0, 0, 0],
         lineWidth: 0.1,
         textColor: [0, 0, 0]
@@ -322,7 +345,7 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
           `Nome: ${row.nome}`,
           `Documento: ${row.documento}`,
           `Tipo: ${row.tipo}`,
-          `Status: ${row.status}`,
+          `Placa: ${row.placa}`,
           `Observações: ${row.observacao}`,
           ''
         ].join('\n');

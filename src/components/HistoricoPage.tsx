@@ -274,16 +274,22 @@ export function HistoricoPage() {
       <Header />
 
       <main className="container mx-auto px-4 py-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div>
-            <h2 className="text-2xl font-display font-bold text-foreground mb-1 flex items-center gap-2">
+        {/* Filters panel */}
+        <div className="card-elevated p-5 mb-6">
+          {/* Header: Título + Toggle Lista/Diário */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 pb-4 border-b border-border/50">
+            <div className="flex items-center gap-3">
               <History className="h-6 w-6 text-primary" />
-              Histórico de Movimentações
-            </h2>
-
-          </div>
-          <div className="flex gap-2">
+              <div>
+                <h2 className="text-xl font-display font-bold text-foreground">
+                  Histórico de Movimentações
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {dadosFiltrados.length} registro{dadosFiltrados.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+            </div>
+            
             {/* Toggle View Mode */}
             <div className="flex rounded-lg border border-border p-1 bg-muted/30">
               <Button
@@ -305,38 +311,10 @@ export function HistoricoPage() {
                 Diário
               </Button>
             </div>
-
-
-          </div>
-        </div>
-
-        {/* Filters panel */}
-        <div className="card-elevated p-4 mb-6 animate-fade-in">
-          {/* Header compacto */}
-          <div className="flex items-center justify-between py-2 border-b border-border/50">
-            <h3 className="font-medium text-black text-sm">Filtros</h3>
-            <div className="flex items-center gap-2">
-              {hasActiveFilters && (
-                <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full font-medium">
-                  {Object.values(filtros).filter(v => v !== '').length + (globalSearch.trim() ? 1 : 0)} ativo(s)
-                </span>
-              )}
-              {hasActiveFilters && (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={clearAllFilters} 
-                  className="text-xs text-black hover:bg-muted/50"
-                >
-                  <RefreshCw className="h-3 w-3 mr-1" />
-                  Limpar
-                </Button>
-              )}
-            </div>
           </div>
 
-          {/* Busca global compacta */}
-          <div className="mt-3 mb-3">
+          {/* Busca global */}
+          <div className="mt-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -789,25 +767,25 @@ export function HistoricoPage() {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b border-border bg-muted/50">
-                          <th className="text-left py-3 px-5 text-xs font-medium text-black uppercase tracking-wider">
+                          <th className="text-center py-3 px-5 text-xs font-medium text-black uppercase tracking-wider">
                             Pessoa
                           </th>
                           <th className="text-left py-3 px-5 text-xs font-medium text-black uppercase tracking-wider hidden sm:table-cell">
                             Documento
                           </th>
-                          <th className="text-left py-3 px-5 text-xs font-medium text-black uppercase tracking-wider hidden lg:table-cell">
+                          <th className="text-center py-3 px-5 text-xs font-medium text-black uppercase tracking-wider hidden lg:table-cell">
                             Placa
                           </th>
-                          <th className="text-left py-3 px-5 text-xs font-medium text-black uppercase tracking-wider">
+                          <th className="text-center py-3 px-5 text-xs font-medium text-black uppercase tracking-wider">
                             Entrada
                           </th>
-                          <th className="text-left py-3 px-5 text-xs font-medium text-black uppercase tracking-wider hidden md:table-cell">
+                          <th className="text-center py-3 px-5 text-xs font-medium text-black uppercase tracking-wider hidden md:table-cell">
                             Saída
                           </th>
                           <th className="text-left py-3 px-5 text-xs font-medium text-black uppercase tracking-wider">
                             Status
                           </th>
-                          <th className="text-right py-3 px-5 text-xs font-medium text-black uppercase tracking-wider">
+                          <th className="text-center py-3 px-5 text-xs font-medium text-black uppercase tracking-wider">
                             Ação
                           </th>
                         </tr>

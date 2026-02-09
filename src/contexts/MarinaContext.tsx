@@ -5,6 +5,7 @@ import { useAuth, UserProfile } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { validators } from '@/lib/validation';
 import { marinaService } from '@/services/marinaService';
+import { format } from 'date-fns';
 
 interface MarinaContextType {
   // Auth state (from useAuth)
@@ -77,6 +78,7 @@ export function MarinaProvider({ children }: { children: ReactNode }) {
 
 
   // Load business data when user changes
+  // OPTIMIZED: Load only active records first, full data on demand
   useEffect(() => {
     if (!authUser?.profile) {
       setPessoas([]);
@@ -89,14 +91,58 @@ export function MarinaProvider({ children }: { children: ReactNode }) {
       try {
         const empresaId = authUser.profile.empresa_id;
 
-        // Load pessoas and movimentacoes using RPC with pagination to bypass 1000 record limit
-        const [pessoasData, movimentacoesData] = await Promise.all([
-          marinaService.getPessoasPorEmpresa(empresaId),
-          marinaService.getMovimentacoesPorEmpresa(empresaId)
-        ]);
+        // STEP 1: Load only active movimentacoes (people inside) - much faster!
+        const { data: movimentacoesAtivas } = await supabase
+          .from('movimentacoes')
+          .select('*')
+          .eq('empresa_id', empresaId)
+          .eq('status', 'DENTRO')
+          .order('entrada_em', { ascending: false });
 
+        // STEP 2: Load pessoas that are inside the marina (just those needed for display)
+        const pessoasIdsInside = movimentacoesAtivas?.map(m => m.pessoa_id) || [];
+        
+        let pessoasData: Pessoa[] = [];
+        
+        if (pessoasIdsInside.length > 0) {
+          const { data: pessoasInside } = await supabase
+            .from('pessoas')
+            .select('*')
+            .in('id', pessoasIdsInside);
+          pessoasData = pessoasInside || [];
+        }
+
+        // Set initial state with just active data
+        setMovimentacoes(movimentacoesAtivas || []);
         setPessoas(pessoasData);
-        setMovimentacoes(movimentacoesData);
+
+        // STEP 3: Background load ALL data for history/reports (not blocking UI)
+        // This can take longer but won't block the user experience
+        setTimeout(async () => {
+          try {
+            const [allPessoas, allMovimentacoes] = await Promise.all([
+              marinaService.getPessoasPorEmpresa(empresaId),
+              marinaService.getMovimentacoesPorEmpresa(empresaId)
+            ]);
+            
+            // Only update if component is still mounted and data changed
+            setPessoas(prev => {
+              if (prev.length < allPessoas.length) {
+                return allPessoas;
+              }
+              return prev;
+            });
+            
+            setMovimentacoes(prev => {
+              if (prev.length < allMovimentacoes.length) {
+                return allMovimentacoes;
+              }
+              return prev;
+            });
+          } catch (bgError) {
+            console.warn('[MarinaContext] Background load failed (non-critical):', bgError);
+          }
+        }, 1000); // Delay to not block initial render
 
       } catch (error) {
         console.error('[MarinaContext] Erro ao carregar dados:', error);
@@ -442,7 +488,7 @@ export function MarinaProvider({ children }: { children: ReactNode }) {
     }
   }, [movimentacoes]);
 
-  // Excluir movimentação (soft delete - registra excluido_em)
+  // Excluir movimentação (soft delete - registra excluido_em e adiciona texto na observação)
   const excluirMovimentacao = useCallback(async (movimentacaoId: string): Promise<void> => {
     try {
       const movimentacao = movimentacoes.find(m => m.id === movimentacaoId);
@@ -451,9 +497,18 @@ export function MarinaProvider({ children }: { children: ReactNode }) {
         throw new Error('Movimentação não encontrada');
       }
 
+      // Concatenar texto de exclusão na observação existente
+      const observacaoOriginal = movimentacao.observacao || '';
+      const observacaoExclusao = observacaoOriginal 
+        ? `${observacaoOriginal} | EXCLUÍDA em ${format(new Date(), 'dd/MM/yyyy HH:mm')}`
+        : `EXCLUÍDA em ${format(new Date(), 'dd/MM/yyyy HH:mm')}`;
+
       const { data: movimentacaoExcluida, error } = await supabase
         .from('movimentacoes')
-        .update({ excluido_em: new Date().toISOString() })
+        .update({ 
+          excluido_em: new Date().toISOString(),
+          observacao: observacaoExclusao
+        })
         .eq('id', movimentacaoId)
         .select()
         .single();

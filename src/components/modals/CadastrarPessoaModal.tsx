@@ -165,7 +165,7 @@ export function CadastrarPessoaModal({ open, onOpenChange, onCadastrarERegistrar
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl p-6">
+      <DialogContent className="max-w-2xl p-6" hideCloseButton>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="h-5 w-5 text-primary" />

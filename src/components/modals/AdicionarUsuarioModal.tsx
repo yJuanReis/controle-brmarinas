@@ -104,7 +104,7 @@ export function AdicionarUsuarioModal({ open, onOpenChange }: AdicionarUsuarioMo
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" hideCloseButton>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 font-display">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100">

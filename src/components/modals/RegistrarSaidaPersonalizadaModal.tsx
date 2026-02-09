@@ -71,7 +71,7 @@ export function RegistrarSaidaPersonalizadaModal({ open, onOpenChange, pessoaDen
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg" hideCloseButton>
         <DialogHeader>
           <DialogTitle>Registrar Saída Personalizada</DialogTitle>
           <DialogDescription>

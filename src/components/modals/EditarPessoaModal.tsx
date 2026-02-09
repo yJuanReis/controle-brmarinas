@@ -86,7 +86,7 @@ export function EditarPessoaModal({ open, onOpenChange, pessoa }: EditarPessoaMo
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md p-6">
+      <DialogContent className="sm:max-w-md p-6" hideCloseButton>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="h-5 w-5 text-primary" />

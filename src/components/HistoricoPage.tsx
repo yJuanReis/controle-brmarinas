@@ -68,8 +68,8 @@ export function HistoricoPage() {
 
   // Estado de paginação organizado
   const [pagination, setPagination] = useState({
-    list: { page: 1, pageSize: 100 },
-    daily: { page: 1, pageSize: 10 }
+    list: { page: 1, pageSize: 50 },
+    daily: { page: 1, pageSize: 50 }
   });
 
   const [editandoPessoa, setEditandoPessoa] = useState<Pessoa | null>(null);
@@ -189,8 +189,8 @@ export function HistoricoPage() {
     });
     setGlobalSearch('');
     setPagination({
-      list: { page: 1, pageSize: 100 },
-      daily: { page: 1, pageSize: 10 }
+      list: { page: 1, pageSize: 50 },
+      daily: { page: 1, pageSize: 50 }
     });
   }, []);
 
@@ -453,10 +453,9 @@ export function HistoricoPage() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="10">10</SelectItem>
-                          <SelectItem value="20">20</SelectItem>
+                          <SelectItem value="25">25</SelectItem>
                           <SelectItem value="50">50</SelectItem>
-                          <SelectItem value="100">100</SelectItem>
+                          <SelectItem value="75">75</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -472,9 +471,9 @@ export function HistoricoPage() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="5">5</SelectItem>
-                          <SelectItem value="10">10</SelectItem>
-                          <SelectItem value="20">20</SelectItem>
+                          <SelectItem value="25">25</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                          <SelectItem value="75">75</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

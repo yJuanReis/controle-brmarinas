@@ -168,9 +168,8 @@ export function RegistrarEntradaModal({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-6xl h-[90vh] max-h-[900px] flex flex-col p-0 overflow-hidden bg-slate-50 gap-0" hideCloseButton>
         <DialogHeader>
-          <DialogTitle>Registrar Entrada</DialogTitle>
+          <DialogTitle></DialogTitle>
           <DialogDescription>
-            Selecione uma pessoa para registrar sua entrada na marina
           </DialogDescription>
         </DialogHeader>
 

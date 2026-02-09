@@ -114,11 +114,10 @@ export function RegistrarSaidaEmLoteModal({ open, onOpenChange, pessoasDentro }:
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-full max-w-4xl max-h-[90vh] overflow-y-auto" hideCloseButton>
         <DialogHeader>
-          <DialogTitle>Saída em Lote</DialogTitle>
-          <DialogDescription>
-            Registre a saída de múltiplas pessoas da marina
+          <DialogTitle></DialogTitle>
+          <DialogDescription>          
           </DialogDescription>
         </DialogHeader>
 
@@ -304,7 +303,7 @@ export function RegistrarSaidaEmLoteModal({ open, onOpenChange, pessoasDentro }:
           setObservacaoConfirm('');
         }
       }}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md" hideCloseButton>
           <DialogHeader>
             <DialogTitle>Confirmar Saída</DialogTitle>
             <DialogDescription>
@@ -422,7 +421,7 @@ export function RegistrarSaidaEmLoteModal({ open, onOpenChange, pessoasDentro }:
           setTimerConcluido(false);
         }
       }}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md" hideCloseButton>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 font-display">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-destructive-light">

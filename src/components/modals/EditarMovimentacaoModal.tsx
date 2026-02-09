@@ -19,21 +19,35 @@ interface EditarMovimentacaoModalProps {
 }
 
 export function EditarMovimentacaoModal({ open, onOpenChange, movimentacao }: EditarMovimentacaoModalProps) {
-  const { atualizarMovimentacao, excluirMovimentacao } = useMarina();
+  const { atualizarMovimentacao, excluirMovimentacao, atualizarPessoa } = useMarina();
   const [formData, setFormData] = useState({
     entrada_em: '',
     saida_em: '',
     observacao: '',
+    placa: '',
   });
+  const [placaOriginal, setPlacaOriginal] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Preencher formulário com dados da movimentação
   useEffect(() => {
-    if (movimentacao && movimentacao.entrada_em) {
+    if (!movimentacao) {
+      setFormData({ entrada_em: '', saida_em: '', observacao: '', placa: '' });
+      return;
+    }
+
+    // Compatibilidade com MovimentacaoComPessoa (entrada_em) e PessoaDentro (entradaEm)
+    const entradaDate = 'entrada_em' in movimentacao && movimentacao.entrada_em 
+      ? movimentacao.entrada_em 
+      : 'entradaEm' in movimentacao && movimentacao.entradaEm
+        ? movimentacao.entradaEm
+        : null;
+
+    if (entradaDate) {
       // Converter datas para formato datetime-local
       let entradaFormatted = '';
-      const entrada = new Date(movimentacao.entrada_em);
+      const entrada = new Date(entradaDate);
       if (!isNaN(entrada.getTime())) {
         entradaFormatted = format(entrada, "yyyy-MM-dd'T'HH:mm");
       }
@@ -46,15 +60,20 @@ export function EditarMovimentacaoModal({ open, onOpenChange, movimentacao }: Ed
         }
       }
 
+      const pessoa = 'pessoa' in movimentacao ? movimentacao.pessoa : movimentacao.pessoa;
+      const placaPessoa = pessoa?.placa || '';
+
       setFormData({
         entrada_em: entradaFormatted,
         saida_em: saidaFormatted,
         observacao: movimentacao.observacao || '',
+        placa: placaPessoa,
       });
+      setPlacaOriginal(placaPessoa);
       setErrors({});
     } else if (!movimentacao) {
       // Reset form when closed
-      setFormData({ entrada_em: '', saida_em: '', observacao: '' });
+      setFormData({ entrada_em: '', saida_em: '', observacao: '', placa: '' });
     }
   }, [movimentacao, open]);
 
@@ -85,25 +104,32 @@ export function EditarMovimentacaoModal({ open, onOpenChange, movimentacao }: Ed
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate() || !movimentacao) return;
 
     const movimentacaoId = 'movimentacaoId' in movimentacao ? movimentacao.movimentacaoId : movimentacao.id;
+    const pessoa = 'pessoa' in movimentacao ? movimentacao.pessoa : movimentacao.pessoa;
 
-    atualizarMovimentacao(movimentacaoId, {
+    await atualizarMovimentacao(movimentacaoId, {
       entrada_em: new Date(formData.entrada_em).toISOString(),
       saida_em: formData.saida_em ? new Date(formData.saida_em).toISOString() : undefined,
       observacao: formData.observacao.trim() || undefined,
     });
 
-    setFormData({ entrada_em: '', saida_em: '', observacao: '' });
+    // Atualizar placa da pessoa se foi alterada
+    if (pessoa && formData.placa !== placaOriginal) {
+      await atualizarPessoa(pessoa.id, { placa: formData.placa });
+    }
+
+    setFormData({ entrada_em: '', saida_em: '', observacao: '', placa: '' });
+    setPlacaOriginal('');
     setErrors({});
     onOpenChange(false);
   };
 
   const handleClose = () => {
-    setFormData({ entrada_em: '', saida_em: '', observacao: '' });
+    setFormData({ entrada_em: '', saida_em: '', observacao: '', placa: '' });
     setErrors({});
     onOpenChange(false);
   };
@@ -132,11 +158,32 @@ export function EditarMovimentacaoModal({ open, onOpenChange, movimentacao }: Ed
                 <span className="font-medium">{pessoa.nome}</span>
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                <span>{pessoa.documento}</span>
-                {pessoa.placa && <span>• Placa: {formatters.placa(pessoa.placa)}</span>}
+                
+                
+                {pessoa.contato && <span>• Contato: {pessoa.contato}</span>}
+                {pessoa.documento && <span>• Doc: {pessoa.documento}</span>}
+
+
               </div>
             </div>
           )}
+
+          {/* Placa */}
+          <div className="space-y-2">
+            <Label htmlFor="placa" className="flex items-center gap-2 text-sm font-medium">
+              Placa do Veículo
+            </Label>
+            <Input
+              id="placa"
+              type="text"
+              value={formData.placa}
+              onChange={(e) => handleChange('placa', e.target.value.toUpperCase())}
+              placeholder="ABC-1234"
+              maxLength={8}
+              className="h-11 uppercase"
+            />
+          </div>
+
 
           {/* Entrada */}
           <div className="space-y-2">
@@ -191,6 +238,7 @@ export function EditarMovimentacaoModal({ open, onOpenChange, movimentacao }: Ed
               className="w-full min-h-[80px] px-3 py-2 rounded-md border border-input bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
             />
           </div>
+
 
           <DialogFooter className="gap-2 sm:gap-0 flex-col sm:flex-row">
             <Button 

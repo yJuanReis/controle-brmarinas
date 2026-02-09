@@ -11,6 +11,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
 import { EditarPessoaModal } from '@/components/modals/EditarPessoaModal';
 import { CadastrarPessoaModal } from '@/components/modals/CadastrarPessoaModal';
 import { ExcluirPessoaModal } from '@/components/modals/ExcluirPessoaModal';
@@ -45,22 +53,25 @@ export function PessoasPage() {
   const { pessoas } = useMarina();
   const [searchTerm, setSearchTerm] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [editandoPessoa, setEditandoPessoa] = useState<Pessoa | null>(null);
   const [excluindoPessoa, setExcluindoPessoa] = useState<Pessoa | null>(null);
   const [showCadastrar, setShowCadastrar] = useState(false);
   const [nomePreenchidoCadastro, setNomePreenchidoCadastro] = useState<string>('');
   const [showScrollTop, setShowScrollTop] = useState(false);
 
-  // Efeito para controlar visibilidade do botão flutuante
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-      setShowScrollTop(scrollTop > 300);
-    };
+  // Pagination helpers
+  const getTotalPages = (totalItems: number, size: number) => Math.ceil(totalItems / size);
+  const getPaginatedItems = <T,>(items: T[], page: number, size: number): T[] => {
+    const startIndex = (page - 1) * size;
+    return items.slice(startIndex, startIndex + size);
+  };
 
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  // Resetar página ao alterar filtros
+  const handleFilterChange = () => {
+    setCurrentPage(1);
+  };
 
   const pessoasFiltradas = useMemo(() => {
     const filteredBySearch = pessoas.filter(p => 
@@ -73,6 +84,23 @@ export function PessoasPage() {
       tipoFiltro === 'all' || p.tipo === tipoFiltro
     );
   }, [pessoas, searchTerm, tipoFiltro]);
+
+  const pessoasPaginadas = useMemo(() => {
+    return getPaginatedItems(pessoasFiltradas, currentPage, pageSize);
+  }, [pessoasFiltradas, currentPage, pageSize]);
+
+  const totalPages = getTotalPages(pessoasFiltradas.length, pageSize);
+
+  // Efeito para controlar visibilidade do botão flutuante
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      setShowScrollTop(scrollTop > 300);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">
@@ -176,78 +204,141 @@ export function PessoasPage() {
             </p>
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {pessoasFiltradas.map((pessoa) => (
-              <div 
-                key={pessoa.id}
-                className="card-elevated p-5 hover:shadow-lg transition-smooth"
-              >
-                <div className="flex items-start gap-4 mb-4">
-                  <UserTypeAvatar pessoa={pessoa} />
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-foreground truncate">
-                      {pessoa.nome}
-                    </h3>
-                    {pessoa.tipo && (
-                      <p className="text-xs font-medium text-primary mt-1">
-                        {pessoa.tipo.charAt(0).toUpperCase() + pessoa.tipo.slice(1)}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setEditandoPessoa(pessoa)}
-                      className="gap-1.5"
-                    >
-                      <Edit className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">Editar</span>
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setExcluindoPessoa(pessoa)}
-                      className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">Excluir</span>
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-2 border-t border-border pt-4">
-                  {/* Documento */}
-                  <div className="flex items-center gap-2 text-sm">
-                    <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                    <span className="text-muted-foreground">Documento:</span>
-                    <span className="font-mono text-foreground">{pessoa.documento}</span>
-                  </div>
-
-                  {/* Contato */}
-                  {pessoa.contato && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      <span className="text-muted-foreground">Contato:</span>
-                      <span className="font-medium text-foreground">{pessoa.contato}</span>
+          <>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {pessoasPaginadas.map((pessoa) => (
+                  <div 
+                    key={pessoa.id}
+                    className="card-elevated p-5 hover:shadow-lg transition-smooth"
+                  >
+                    <div className="flex items-start gap-4 mb-4">
+                      <UserTypeAvatar pessoa={pessoa} />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-foreground truncate">
+                          {pessoa.nome}
+                        </h3>
+                        {pessoa.tipo && (
+                          <p className="text-xs font-medium text-primary mt-1">
+                            {pessoa.tipo.charAt(0).toUpperCase() + pessoa.tipo.slice(1)}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setEditandoPessoa(pessoa)}
+                          className="gap-1.5"
+                        >
+                          <Edit className="h-3.5 w-3.5" />
+                          <span className="hidden sm:inline">Editar</span>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setExcluindoPessoa(pessoa)}
+                          className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span className="hidden sm:inline">Excluir</span>
+                        </Button>
+                      </div>
                     </div>
-                  )}
 
-                  {/* Placa */}
-                  {pessoa.placa && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Car className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      <span className="text-muted-foreground">Placa:</span>
-                      <span className="font-mono bg-muted px-2 py-0.5 rounded text-xs font-medium text-foreground">
-                        {formatters.placa(pessoa.placa)}
-                      </span>
+                    <div className="space-y-2 border-t border-border pt-4">
+                      {/* Documento */}
+                      <div className="flex items-center gap-2 text-sm">
+                        <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <span className="text-muted-foreground">Documento:</span>
+                        <span className="font-mono text-foreground">{pessoa.documento}</span>
+                      </div>
+
+                      {/* Contato */}
+                      {pessoa.contato && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <span className="text-muted-foreground">Contato:</span>
+                          <span className="font-medium text-foreground">{pessoa.contato}</span>
+                        </div>
+                      )}
+
+                      {/* Placa */}
+                      {pessoa.placa && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Car className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <span className="text-muted-foreground">Placa:</span>
+                          <span className="font-mono bg-muted px-2 py-0.5 rounded text-xs font-medium text-foreground">
+                            {formatters.placa(pessoa.placa)}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 p-4 border-t border-border">
+                  <div className="text-sm text-muted-foreground">
+                    Mostrando {Math.min((currentPage - 1) * pageSize + 1, pessoasFiltradas.length)} a {Math.min(currentPage * pageSize, pessoasFiltradas.length)} de {pessoasFiltradas.length} pessoas
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Select value={pageSize.toString()} onValueChange={(value) => { setPageSize(parseInt(value)); setCurrentPage(1); }}>
+                      <SelectTrigger className="w-24">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="25">25 por página</SelectItem>
+                        <SelectItem value="50">50 por página</SelectItem>
+                        <SelectItem value="75">75 por página</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Pagination>
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious 
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                            className={currentPage <= 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                          />
+                        </PaginationItem>
+                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                          const totalP = totalPages;
+                          let pageNum;
+                          if (totalP <= 5) {
+                            pageNum = i + 1;
+                          } else if (currentPage <= 3) {
+                            pageNum = i + 1;
+                          } else if (currentPage >= totalP - 2) {
+                            pageNum = totalP - 4 + i;
+                          } else {
+                            pageNum = currentPage - 2 + i;
+                          }
+                          return (
+                            <PaginationItem key={pageNum}>
+                              <PaginationLink
+                                onClick={() => setCurrentPage(pageNum)}
+                                isActive={currentPage === pageNum}
+                                className="cursor-pointer"
+                              >
+                                {pageNum}
+                              </PaginationLink>
+                            </PaginationItem>
+                          );
+                        })}
+                        <PaginationItem>
+                          <PaginationNext 
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                            className={currentPage >= totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                          />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
       </main>
 
       {/* Modals */}

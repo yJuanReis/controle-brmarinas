@@ -34,6 +34,7 @@ BEGIN
     m.created_at
   FROM movimentacoes m
   WHERE m.empresa_id = p_empresa_id
+    AND m.excluido_em IS NULL
   ORDER BY m.entrada_em DESC
   LIMIT p_limit
   OFFSET p_offset;

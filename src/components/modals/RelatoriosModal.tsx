@@ -352,7 +352,7 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl max-w-full bg-gradient-to-br from-blue-50 to-white">
+      <DialogContent className="sm:max-w-4xl max-w-full bg-gradient-to-br from-blue-50 to-white" hideCloseButton>
         <DialogHeader className="space-y-2">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-100 rounded-lg">

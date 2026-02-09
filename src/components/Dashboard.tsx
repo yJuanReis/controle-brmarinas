@@ -68,7 +68,7 @@ export function Dashboard() {
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(100);
+  const [pageSize, setPageSize] = useState(50);
 
   // Efeito para controlar visibilidade do botão flutuante
   useEffect(() => {

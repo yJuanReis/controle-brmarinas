@@ -1,20 +1,20 @@
-import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Popover, PopoverContent } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useMarina } from '@/contexts/MarinaContext';
 import { marinaService } from '@/services/marinaService';
-import { Calendar, Download, FileText, FileSpreadsheet, FileText as FileTextIcon, File, Download as DownloadIcon } from 'lucide-react';
-import { format, startOfDay, endOfDay, startOfMonth, endOfMonth } from 'date-fns';
+import { endOfMonth, format, startOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { Calendar, Download as DownloadIcon, File, FileText as FileTextIcon } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
 import './RelatoriosModal.css';
 
 interface RelatoriosModalProps {

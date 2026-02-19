@@ -1,3 +1,4 @@
+// Final
 /**
  * Funções de formatação para diferentes tipos de campos
  */

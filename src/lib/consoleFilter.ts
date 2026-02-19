@@ -1,3 +1,4 @@
+// Final
 /**
  * Filtro de console para produção
  * - Em produção: bloqueia todos os logs exceto erros

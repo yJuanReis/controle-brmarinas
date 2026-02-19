@@ -1,3 +1,4 @@
+// Final
 import { useEffect, useRef } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
 

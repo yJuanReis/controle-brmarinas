@@ -1,3 +1,4 @@
+// Final
 /**
  * Funções de validação para documentos e formatos brasileiros
  */

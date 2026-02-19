@@ -1,3 +1,4 @@
+// Final
 import { HistoricoPage } from '@/components/HistoricoPage';
 
 const Historico = () => {

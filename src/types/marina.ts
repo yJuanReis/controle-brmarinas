@@ -1,3 +1,4 @@
+// Final
 // Data types for Marina Access Control System
 // Prepared for future Supabase integration
 

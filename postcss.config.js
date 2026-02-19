@@ -1,3 +1,4 @@
+// Final
 export default {
   plugins: {
     tailwindcss: {},

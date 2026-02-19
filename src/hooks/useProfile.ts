@@ -1,3 +1,4 @@
+// Final
 import { useState, useEffect, useRef } from 'react';
 import { supabase, getSupabaseClient } from '@/lib/supabase';
 import { UserProfile } from '@/hooks/useAuth';

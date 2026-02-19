@@ -1,3 +1,4 @@
+// Final
 import { createClient } from '@supabase/supabase-js';
 
 // Configurações do Supabase

@@ -1,4 +1,7 @@
 {
+  "note": "Final",
+  "note": "Final",
+  "note": "Final",
   "rewrites": [
     { "source": "\\/(.*)", "destination": "/index.html" }
   ]

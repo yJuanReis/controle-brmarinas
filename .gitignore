@@ -38,6 +38,11 @@ build/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.*.local
+
+# Arquivo de exemplo de variáveis de ambiente (use este como modelo!)
+# NÃO commite credenciais reais!
+# Copie env.example para .env.local e preencha com seus dados
 
 # Logs
 npm-debug.log*
@@ -52,3 +57,16 @@ Thumbs.db
 
 # Vercel
 .vercel
+
+#bun
+bun.lockb
+
+#SQL com dados sensíveis (não commitar arquivos .sql que contenham dados reais)
+*.sql
+
+# Pasta do Supabase - manter apenas migrações (não
+supabase/
+
+# Arquivos de backup locais
+*.backup
+*.bak

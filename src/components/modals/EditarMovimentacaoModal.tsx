@@ -387,49 +387,6 @@ export function EditarMovimentacaoModal({ open, onOpenChange, movimentacao }: Ed
               </div>
             )}
             
-            {showNovaPlaca && (
-              <div className="flex items-center gap-1 mt-2">
-                <Input
-                  type="text"
-                  value={novaPlaca}
-                  onChange={(e) => {
-                    let value = e.target.value.toUpperCase();
-                    value = value.replace(/[^a-zA-Z0-9]/g, '');
-                    if (value.length >= 3 && !value.includes('-')) {
-                      value = value.substring(0, 3) + '-' + value.substring(3, 7);
-                    }
-                    setNovaPlaca(value.substring(0, 8));
-                  }}
-                  placeholder="ABC-1234"
-                  maxLength={8}
-                  className="h-10 w-28 text-sm font-mono uppercase"
-                  disabled={isAddingPlaca}
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={handleAdicionarNovaPlaca}
-                  disabled={novaPlaca.length < 7 || isAddingPlaca}
-                >
-                  {isAddingPlaca ? (
-                    <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    'Adicionar'
-                  )}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    setShowNovaPlaca(false);
-                    setNovaPlaca('');
-                  }}
-                >
-                  Cancelar
-                </Button>
-              </div>
-            )}
           </div>
 
 

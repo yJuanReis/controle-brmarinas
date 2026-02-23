@@ -157,14 +157,15 @@ export function EditarMovimentacaoModal({ open, onOpenChange, movimentacao }: Ed
         const placas = await getPlacasPorPessoa(pessoaId);
         setPlacasPessoa(placas);
         
-        // Selecionar a nova placa
-        setPlacaSelecionada(placaAdicionada.placa);
+        // NÃO selecionar automaticamente a nova placa
+        // A placa foi adicionada à pessoa, mas não será salva na movimentação
+        // a menos que o usuário clique nela para selecionar
         
         // Limpar e fechar input
         setNovaPlaca('');
         setShowNovaPlaca(false);
         
-        toast.success('Placa adicionada com sucesso!');
+        toast.success('Placa adicionada à pessoa! Clique em uma placa para selecionar.');
       }
     } catch (error) {
       console.error('Erro ao adicionar placa:', error);
@@ -386,7 +387,7 @@ export function EditarMovimentacaoModal({ open, onOpenChange, movimentacao }: Ed
               </div>
             )}
             
-            {showNovaPlaca && placasPessoa.length > 0 && (
+            {showNovaPlaca && (
               <div className="flex items-center gap-1 mt-2">
                 <Input
                   type="text"

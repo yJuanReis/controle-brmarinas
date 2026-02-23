@@ -9,6 +9,7 @@ import { Pessoa } from '@/types/marina';
 import { FileText, Phone, Car, Users, Gift, Ship, Briefcase } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { validateCPF, validateRG, validatePlaca, validateDocument, detectDocumentType } from '@/lib/validation';
+import { normalizarPlaca } from '@/lib/validation/formatters';
 
 type TipoPessoa = 'cliente' | 'visita' | 'marinheiro' | 'proprietario' | 'colaborador' | 'prestador' | '';
 
@@ -72,7 +73,8 @@ export function EditarPessoaModal({ open, onOpenChange, pessoa }: EditarPessoaMo
     } else if (field === 'contato') {
       processedValue = value.replace(/\D/g, '');
     } else if (field === 'placa') {
-      processedValue = value.toUpperCase();
+      // Usar normalizarPlaca para formatar com espaços: ABC - 1234
+      processedValue = normalizarPlaca(value);
     } else if (field === 'tipo') {
       processedValue = value.toUpperCase();
     }
@@ -104,7 +106,7 @@ export function EditarPessoaModal({ open, onOpenChange, pessoa }: EditarPessoaMo
       // Validar formato da placa
       const placaValidation = validatePlaca(formData.placa.trim());
       if (!placaValidation.isValid) {
-        newErrors.placa = 'Placa inválida. Por favor, insira uma placa no formato ABC-1234 ou ABC-1D23.';
+        newErrors.placa = 'Placa inválida. Por favor, insira uma placa no formato ABC - 1234 ou ABC - 1D23.';
       }
     }
     setErrors(newErrors);
@@ -115,12 +117,15 @@ export function EditarPessoaModal({ open, onOpenChange, pessoa }: EditarPessoaMo
     e.preventDefault();
     if (!validate() || !pessoa) return;
 
+    // Normalizar a placa antes de salvar (adicionar espaços ao redor do hífen se necessário)
+    const placaNormalizada = formData.placa ? normalizarPlaca(formData.placa) : '';
+
     atualizarPessoa(pessoa.id, {
       nome: formData.nome,
       documento: formData.documento,
       tipo: (formData.tipo as TipoPessoa) || undefined,
       contato: formData.contato || undefined,
-      placa: formData.placa || undefined,
+      placa: placaNormalizada || undefined,
     });
 
     setFormData({ nome: '', documento: '', tipo: '', contato: '', placa: '' });
@@ -246,42 +251,11 @@ export function EditarPessoaModal({ open, onOpenChange, pessoa }: EditarPessoaMo
             </Label>
             <Input
               id="placa"
-              placeholder="ABC1234 ou ABC1D23"
+              placeholder="ABC - 1234"
               value={formData.placa}
               onChange={(e) => {
-                let value = e.target.value.toUpperCase();
-                
-                // Se o valor atual tem hífen e o usuário está apagando, permitir a remoção
-                if (value.includes('-')) {
-                  const beforeValue = formData.placa;
-                  const currentValue = value;
-                  
-                  // Verificar se o usuário está apagando (comprimento diminuiu)
-                  if (currentValue.length < beforeValue.length) {
-                    // Se está apagando o hífen, remover o hífen e continuar
-                    if (currentValue.includes('-')) {
-                      value = value.replace('-', '');
-                    } else {
-                      // Se o hífen foi removido, manter sem hífen
-                      value = value.replace(/[^a-zA-Z0-9]/g, '');
-                    }
-                  } else {
-                    // Se está digitando, remover caracteres inválidos e inserir hífen
-                    value = value.replace(/[^a-zA-Z0-9-]/g, '');
-                    if (value.length >= 4 && !value.includes('-')) {
-                      value = value.substring(0, 3) + '-' + value.substring(3);
-                    }
-                  }
-                } else {
-                  // Sem hífen: permitir apenas letras e números
-                  value = value.replace(/[^a-zA-Z0-9]/g, '');
-                  // Inserir hífen após 3 caracteres
-                  if (value.length >= 3) {
-                    value = value.substring(0, 3) + '-' + value.substring(3);
-                  }
-                }
-                
-                handleChange('placa', value);
+                // Usar normalizarPlaca para formatar com espaços: ABC - 1234
+                handleChange('placa', e.target.value);
               }}
               onKeyDown={(e) => {
                 // Permitir teclas de controle
@@ -292,6 +266,7 @@ export function EditarPessoaModal({ open, onOpenChange, pessoa }: EditarPessoaMo
                 }
               }}
               className={cn("h-11 font-mono", errors.placa ? 'border-destructive' : '')}
+              maxLength={9}
             />
             {errors.placa && (
               <p className="text-xs text-destructive">{errors.placa}</p>

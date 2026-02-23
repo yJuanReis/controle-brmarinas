@@ -38,19 +38,49 @@ export const formatters = {
   },
 
   /**
-   * Formata placa: ABC1234 → ABC-1234 ou ABC1D23 → ABC-1D23
+   * Formata placa: ABC1234 → ABC - 1234 ou ABC1D23 → ABC - 1D23
+   * Com espaços ao redor do hífen
    */
   placa: (value: string): string => {
     const cleanValue = value.toUpperCase().replace(/[^A-Z0-9]/g, '');
     
     if (cleanValue.length >= 7) {
-      // Formato antigo: ABC-1234
+      // Formato antigo: ABC - 1234
       return cleanValue.replace(/(\w{3})(\w{4})/, '$1-$2');
     } else if (cleanValue.length >= 6) {
-      // Formato Mercosul: ABC-1D23
+      // Formato Mercosul: ABC - 1D23
       return cleanValue.replace(/(\w{3})(\w{3})/, '$1-$2');
     }
     
     return cleanValue;
   }
 };
+
+/**
+ * Normaliza placa para formato com espaços: ABC1234 → ABC - 1234
+ * Se já tiver com " - ", mantém como está
+ * Se tiver apenas "-", converte para " - "
+ */
+export function normalizarPlaca(placa: string): string {
+  if (!placa) return '';
+  
+  // Se já tem o formato com espaços, retorna como está
+  if (placa.includes(' - ')) {
+    return placa.toUpperCase();
+  }
+  
+  // Remove caracteres inválidos e mantém apenas letras, números e hífen
+  const cleanValue = placa.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+  
+  // Se tem apenas "-", substitui por " - "
+  if (cleanValue.includes('-') && !cleanValue.includes(' - ')) {
+    return cleanValue.replace('-', ' - ');
+  }
+  
+  // Se não tem hífen, adiciona após 3 caracteres
+  if (cleanValue.length >= 4) {
+    return cleanValue.substring(0, 3) + ' - ' + cleanValue.substring(3);
+  }
+  
+  return cleanValue;
+}

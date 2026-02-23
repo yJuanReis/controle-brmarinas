@@ -19,6 +19,7 @@ import { validators, formatters } from '@/lib/validation';
 import { getPlacasPorPessoa, adicionarPlacaPessoa, PlacaPessoa, verificarPessoaEstaDentro } from '@/services/marinaService';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
+import { normalizarPlaca } from '@/lib/validation/formatters';
 
 type TipoPessoa = 'cliente' | 'visita' | 'marinheiro' | 'proprietario' | 'colaborador' | 'prestador' | '';
 
@@ -156,9 +157,12 @@ export function RegistrarEntradaModal({
   const handleAdicionarNovaPlaca = async () => {
     if (!novaPlaca.trim() || !selectedPessoaId) return;
     
+    // Normalizar a placa antes de salvar (adicionar espaços ao redor do hífen)
+    const placaNormalizada = normalizarPlaca(novaPlaca);
+    
     setIsAddingPlaca(true);
     try {
-      const placaAdicionada = await adicionarPlacaPessoa(selectedPessoaId, novaPlaca);
+      const placaAdicionada = await adicionarPlacaPessoa(selectedPessoaId, placaNormalizada);
       
       if (placaAdicionada) {
         // Recarregar placas
@@ -315,17 +319,23 @@ export function RegistrarEntradaModal({
 
   const handleSaveEdit = async () => {
     if (selectedPessoaId) {
+      // Normalizar a placa antes de salvar (adicionar espaços ao redor do hífen se necessário)
+      const placaNormalizada = editData.placa ? normalizarPlaca(editData.placa) : '';
+      
       await atualizarPessoa(selectedPessoaId, {
         nome: editData.nome,
         documento: editData.documento,
         tipo: editData.tipo === '' ? undefined : editData.tipo,
         contato: editData.contato,
-        placa: editData.placa,
+        placa: placaNormalizada,
       });
       setIsEditing(false);
       
+      // Normalizar a placa selecionada antes de registrar entrada
+      const placaSelecionadaNormalizada = placaSelecionada ? normalizarPlaca(placaSelecionada) : '';
+      
       // After saving edits, automatically register the entry (with pernoite data and selected plate)
-      const result = await registrarEntrada(selectedPessoaId, observacao, placaSelecionada, pernoite, pernoite ? diasPernoite : undefined);
+      const result = await registrarEntrada(selectedPessoaId, observacao, placaSelecionadaNormalizada, pernoite, pernoite ? diasPernoite : undefined);
       if (result.success) {
         if (pessoaPreSelecionada && onPessoaPreSelecionadaUsada) {
           onPessoaPreSelecionadaUsada();
@@ -339,7 +349,10 @@ export function RegistrarEntradaModal({
     e.preventDefault();
     if (!selectedPessoaId || !validacao?.pode) return;
 
-    const result = await registrarEntrada(selectedPessoaId, observacao, placaSelecionada, pernoite, pernoite ? diasPernoite : undefined);
+    // Normalizar a placa selecionada antes de registrar entrada
+    const placaNormalizada = placaSelecionada ? normalizarPlaca(placaSelecionada) : '';
+    
+    const result = await registrarEntrada(selectedPessoaId, observacao, placaNormalizada, pernoite, pernoite ? diasPernoite : undefined);
     if (result.success) {
       if (pessoaPreSelecionada && onPessoaPreSelecionadaUsada) {
         onPessoaPreSelecionadaUsada();
@@ -659,15 +672,12 @@ export function RegistrarEntradaModal({
                             type="text"
                             value={novaPlaca}
                             onChange={(e) => {
-                              let value = e.target.value.toUpperCase();
-                              value = value.replace(/[^a-zA-Z0-9]/g, '');
-                              if (value.length >= 3 && !value.includes('-')) {
-                                value = value.substring(0, 3) + '-' + value.substring(3, 7);
-                              }
-                              setNovaPlaca(value.substring(0, 8));
+                              // Usar normalizarPlaca para formatar com espaços: ABC - 1234
+                              const normalized = normalizarPlaca(e.target.value);
+                              setNovaPlaca(normalized);
                             }}
-                            placeholder="ABC-1234"
-                            maxLength={8}
+                            placeholder="ABC - 1234"
+                            maxLength={9}
                             className="h-9 text-sm font-mono uppercase"
                             disabled={isAddingPlaca}
                           />

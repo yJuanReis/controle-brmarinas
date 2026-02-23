@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { getPlacasPorPessoa, adicionarPlacaPessoa, PlacaPessoa } from '@/services/marinaService';
 import { toast } from 'sonner';
+import { normalizarPlaca } from '@/lib/validation/formatters';
 
 // Type guards for union type handling
 const isMovimentacaoComPessoa = (m: MovimentacaoComPessoa | PessoaDentro): m is MovimentacaoComPessoa => {
@@ -148,9 +149,12 @@ export function EditarMovimentacaoModal({ open, onOpenChange, movimentacao }: Ed
     
     if (!pessoaId) return;
     
+    // Normalizar a placa antes de salvar (adicionar espaços ao redor do hífen)
+    const placaNormalizada = normalizarPlaca(novaPlaca);
+    
     setIsAddingPlaca(true);
     try {
-      const placaAdicionada = await adicionarPlacaPessoa(pessoaId, novaPlaca);
+      const placaAdicionada = await adicionarPlacaPessoa(pessoaId, placaNormalizada);
       
       if (placaAdicionada) {
         // Recarregar placas
@@ -214,12 +218,15 @@ export function EditarMovimentacaoModal({ open, onOpenChange, movimentacao }: Ed
       movimentacaoId = movimentacao.movimentacaoId;
     }
 
+    // Normalizar a placa antes de salvar (adicionar espaços ao redor do hífen se necessário)
+    const placaNormalizada = placaSelecionada ? normalizarPlaca(placaSelecionada) : '';
+
     // Atualiza movimentação com a placa selecionada (NUNCA altera tabela de pessoas)
     await atualizarMovimentacao(movimentacaoId, {
       entrada_em: new Date(formData.entrada_em).toISOString(),
       saida_em: formData.saida_em ? new Date(formData.saida_em).toISOString() : undefined,
       observacao: formData.observacao.trim() || undefined,
-      placa: placaSelecionada || undefined,
+      placa: placaNormalizada || undefined,
     });
 
     setFormData({ entrada_em: '', saida_em: '', observacao: '' });
@@ -333,17 +340,13 @@ export function EditarMovimentacaoModal({ open, onOpenChange, movimentacao }: Ed
                       type="text"
                       value={novaPlaca}
                       onChange={(e) => {
-                        let value = e.target.value.toUpperCase();
-                        // Formatar como placa (ABC-1234)
-                        value = value.replace(/[^a-zA-Z0-9]/g, '');
-                        if (value.length >= 3 && !value.includes('-')) {
-                          value = value.substring(0, 3) + '-' + value.substring(3, 7);
-                        }
-                        setNovaPlaca(value.substring(0, 8));
+                        // Usar normalizarPlaca para formatar com espaços: ABC-1234
+                        const normalized = normalizarPlaca(e.target.value);
+                        setNovaPlaca(normalized);
                       }}
                       placeholder="ABC-1234"
-                      maxLength={8}
-                      className="h-10 w-28 text-sm font-mono uppercase"
+                      maxLength={9}
+                      className="h-10 w-32 text-sm font-mono uppercase"
                       disabled={isAddingPlaca}
                     />
                     <Button

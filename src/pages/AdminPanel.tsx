@@ -235,6 +235,10 @@ export function AdminPanel() {
                     <Settings className="h-4 w-4" />
                     <span className="hidden sm:inline">Info</span>
                   </TabsTrigger>
+                  <TabsTrigger value="versao" className="flex items-center gap-2">
+                    <RefreshCw className="h-4 w-4" />
+                    <span className="hidden sm:inline">Versão</span>
+                  </TabsTrigger>
                 </>
               )}
             </TabsList>
@@ -844,6 +848,56 @@ export function AdminPanel() {
               )}
             </div>
 
+          </TabsContent>
+
+          {/* Versão Tab - Apenas para Owner */}
+          <TabsContent value="versao" className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900">Gerenciar Versão</h2>
+                <p className="text-sm text-slate-500 mt-1">
+                  Controle a versão do aplicativo para notificar usuários sobre atualizações
+                </p>
+              </div>
+            </div>
+
+            <div className="max-w-2xl">
+              <GerenciarVersaoModal 
+                open={showGerenciarVersaoModal} 
+                onOpenChange={setShowGerenciarVersaoModal} 
+              />
+              
+              {/* Card de atalho direto */}
+              <Card className="border-amber-200 bg-amber-50">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-amber-700">
+                    <RefreshCw className="h-5 w-5" />
+                    Versão Atual
+                  </CardTitle>
+                  <CardDescription className="text-amber-600">
+                    Publique uma nova versão para notificar todos os usuários
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-amber-200">
+                    <div>
+                      <p className="text-sm text-slate-500">Versão do App</p>
+                      <p className="text-2xl font-bold text-amber-700">1.1.9</p>
+                      <p className="text-xs text-slate-400">39 commits</p>
+                    </div>
+                    <RefreshCw className="h-8 w-8 text-amber-500" />
+                  </div>
+                  
+                  <Button
+                    onClick={() => setShowGerenciarVersaoModal(true)}
+                    className="w-full bg-amber-500 hover:bg-amber-600 gap-2"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    Publicar Atualização
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
 

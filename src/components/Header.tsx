@@ -6,6 +6,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { useMemo } from 'react';
+import { APP_VERSION } from '@/lib/version';
 
 export function Header() {
   const { empresaAtual, user, logout, getPessoasDentro } = useMarina();
@@ -58,7 +59,7 @@ export function Header() {
                 BR Marinas
               </h1>
               <p className="text-xs text-slate-300 font-medium">
-                Sistema de Controle de Acesso - BR Marinas
+                Sistema de Controle de Acesso - BR Marinas v{APP_VERSION}
               </p>
             </div>
           </div>

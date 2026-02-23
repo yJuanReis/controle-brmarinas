@@ -73,6 +73,7 @@ import { RelatoriosModal } from '@/components/modals/RelatoriosModal';
 import { GerenciarVersaoModal } from '@/components/modals/GerenciarVersaoModal';
 import { Navigate } from 'react-router-dom';
 import { AppUser } from '@/types/marina';
+import { APP_VERSION, COMMIT_COUNT } from '@/lib/version';
 
 export function AdminPanel() {
   const { user, empresaAtual, logout, empresas, pessoas, movimentacoes, getUsuarios, adicionarUsuario, removerUsuario, alterarSenhaUsuario, deletarEmpresa } = useMarina();
@@ -823,29 +824,7 @@ export function AdminPanel() {
                 </CardContent>
               </Card>
 
-              {/* Versão do App - Apenas para Owner */}
-              {user?.role === 'owner' && (
-                <Card className="border-amber-200 bg-amber-50">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-amber-700">
-                      <RefreshCw className="h-5 w-5" />
-                      Versão do App
-                    </CardTitle>
-                    <CardDescription className="text-amber-600">
-                      Gerencie a versão para notificar usuários sobre atualizações
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Button
-                      onClick={() => setShowGerenciarVersaoModal(true)}
-                      className="w-full bg-amber-500 hover:bg-amber-600 gap-2"
-                    >
-                      <RefreshCw className="h-4 w-4" />
-                      Gerenciar Versão
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
+
             </div>
 
           </TabsContent>
@@ -868,7 +847,7 @@ export function AdminPanel() {
               />
               
               {/* Card de atalho direto */}
-              <Card className="border-amber-200 bg-amber-50">
+              <Card className="border-amber-200 bg-amber-50 ">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-amber-700">
                     <RefreshCw className="h-5 w-5" />
@@ -882,8 +861,8 @@ export function AdminPanel() {
                   <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-amber-200">
                     <div>
                       <p className="text-sm text-slate-500">Versão do App</p>
-                      <p className="text-2xl font-bold text-amber-700">1.1.9</p>
-                      <p className="text-xs text-slate-400">39 commits</p>
+                      <p className="text-2xl font-bold text-amber-700">{APP_VERSION}</p>
+                      <p className="text-xs text-slate-400">{COMMIT_COUNT} commits</p>
                     </div>
                     <RefreshCw className="h-8 w-8 text-amber-500" />
                   </div>

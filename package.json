@@ -7,10 +7,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "node scripts/generate-version.cjs",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "version": "node scripts/generate-version.cjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

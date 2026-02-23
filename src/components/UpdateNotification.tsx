@@ -1,4 +1,5 @@
-import { useAppVersion, APP_VERSION } from '@/hooks/useAppVersion';
+import { useAppVersion } from '@/hooks/useAppVersion';
+import { APP_VERSION } from '@/lib/version';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 

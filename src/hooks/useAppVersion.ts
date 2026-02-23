@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
-
-// Versão do app (lida do package.json)
-const APP_VERSION = import.meta.env.VITE_APP_VERSION || '0.0.0';
+import { APP_VERSION } from '@/lib/version';
 
 interface VersionInfo {
   serverVersion: string;

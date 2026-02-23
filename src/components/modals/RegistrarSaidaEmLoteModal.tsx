@@ -8,10 +8,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { useMarina } from '@/contexts/MarinaContext';
 import { PessoaDentro } from '@/types/marina';
 import { UserTypeAvatar } from '@/lib/userTypeIcons';
-import { LogOut, Check, MessageSquare, Search, X, History, User, Phone, Car, Clock, AlertCircle } from 'lucide-react';
+import { LogOut, Check, MessageSquare, Search, X, History, User, Phone, Car, Clock, AlertCircle, Moon, Shield } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { validators, formatters } from '@/lib/validation';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface RegistrarSaidaEmLoteModalProps {
   open: boolean;
@@ -33,6 +34,18 @@ export function RegistrarSaidaEmLoteModal({ open, onOpenChange, pessoasDentro }:
   const [confirmacaoTexto, setConfirmacaoTexto] = useState('');
   const [timerConcluido, setTimerConcluido] = useState(false);
   const [tempoRestante, setTempoRestante] = useState(3);
+  
+  // Estado de proteção - pessoas que NÃO terão saída registrada (checkboxes marcados por padrão para pernoites)
+  const [pessoasProtegidas, setPessoasProtegidas] = useState<Set<string>>(() => {
+    // Por padrão, proteger quem tem pernoite marcado
+    const inicial = new Set<string>();
+    pessoasDentro.forEach(p => {
+      if (p.pernoite) {
+        inicial.add(p.movimentacaoId);
+      }
+    });
+    return inicial;
+  });
 
   // Timer de segurança
   useEffect(() => {
@@ -159,20 +172,57 @@ export function RegistrarSaidaEmLoteModal({ open, onOpenChange, pessoasDentro }:
             )}
           </div>
 
+          {/* Aviso sobre proteção */}
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2">
+            <Shield className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <p className="font-medium text-blue-900">Pessoas protegidas da saída em lote</p>
+              <p className="text-blue-700">Marque as pessoas que devem ser <strong>protegidas</strong> (não terão saída registrada). Por padrão, pessoas com pernoite já estão protegidas.</p>
+            </div>
+          </div>
+
           <div className="space-y-2 max-h-[50vh] overflow-y-auto">
             {pessoasFiltradas.map((item) => {
               const jaRegistrou = saidaRegistrada.has(item.movimentacaoId);
               const mostraObs = mostrando.has(item.movimentacaoId);
+              const isProtegida = pessoasProtegidas.has(item.movimentacaoId);
               return (
                 <div
                   key={item.movimentacaoId}
                   className={`rounded-lg border p-3 transition-smooth ${
                     jaRegistrou
                       ? 'bg-success/10 border-success/50'
-                      : 'bg-muted/30 border-border hover:bg-muted/50'
+                      : isProtegida
+                        ? 'bg-blue-50/50 border-blue-200'
+                        : 'bg-muted/30 border-border hover:bg-muted/50'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-3">
+                    {/* Checkbox de proteção */}
+                    <Checkbox
+                      checked={isProtegida}
+                      onCheckedChange={(checked) => {
+                        setPessoasProtegidas(prev => {
+                          const next = new Set(prev);
+                          if (checked) {
+                            next.add(item.movimentacaoId);
+                          } else {
+                            next.delete(item.movimentacaoId);
+                          }
+                          return next;
+                        });
+                      }}
+                      className="shrink-0"
+                    />
+                    
+                    {/* Badge de pernoite */}
+                    {item.pernoite && (
+                      <div className="flex items-center gap-1 text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full shrink-0">
+                        <Moon className="h-3 w-3" />
+                        {item.dias_pernoite || 1}d
+                      </div>
+                    )}
+                    
                     {/* Informações compactas */}
                     <div className="flex-1 min-w-0">
                       <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-sm">
@@ -279,7 +329,10 @@ export function RegistrarSaidaEmLoteModal({ open, onOpenChange, pessoasDentro }:
             className="gap-2"
           >
             <LogOut className="h-4 w-4" />
-            Registrar saida de todas as {pessoasDentro.length} pessoa{pessoasDentro.length > 1 ? 's' : ''}
+            Registrar saida de {pessoasDentro.length - pessoasProtegidas.size} pessoa{pessoasDentro.length - pessoasProtegidas.size !== 1 ? 's' : ''}
+            {pessoasProtegidas.size > 0 && (
+              <span className="text-xs opacity-80">({pessoasProtegidas.size} protegida{pessoasProtegidas.size > 1 ? 's' : ''})</span>
+            )}
           </Button>
           <Button
             type="button"
@@ -431,7 +484,7 @@ export function RegistrarSaidaEmLoteModal({ open, onOpenChange, pessoasDentro }:
               Saída em Lote
             </DialogTitle>
             <DialogDescription>
-              Tem certeza que deseja registrar saída para todas as {pessoasDentro.length} pessoa{pessoasDentro.length > 1 ? 's' : ''} dentro da marina?
+              Registrar saída para {pessoasDentro.length - pessoasProtegidas.size} pessoa{pessoasDentro.length - pessoasProtegidas.size !== 1 ? 's' : ''} (excluindo {pessoasProtegidas.size} protegida{pessoasProtegidas.size > 1 ? 's' : ''})
             </DialogDescription>
           </DialogHeader>
 
@@ -439,7 +492,8 @@ export function RegistrarSaidaEmLoteModal({ open, onOpenChange, pessoasDentro }:
             <div className="p-4 rounded-lg bg-muted">
               <p className="text-sm text-muted-foreground mb-2">Esta ação:</p>
               <ul className="text-sm space-y-1">
-                <li>• Registrar saída para todas as pessoas dentro da marina</li>
+                <li>• Registrar saída para {pessoasDentro.length - pessoasProtegidas.size} pessoa{pessoasDentro.length - pessoasProtegidas.size !== 1 ? 's' : ''}</li>
+                <li>• {pessoasProtegidas.size} pessoa{pessoasProtegidas.size > 1 ? 's' : ''} ficarão protegidas (sem saída)</li>
                 <li>• Usará o horário atual como horário de saída</li>
                 <li>• Não será possível desfazer</li>
               </ul>
@@ -450,19 +504,19 @@ export function RegistrarSaidaEmLoteModal({ open, onOpenChange, pessoasDentro }:
               <span>Horário de saída: {format(new Date(), "HH:mm", { locale: ptBR })}</span>
             </div>
 
-            {/* Lista detalhada das pessoas */}
+            {/* Lista detalhada das pessoas que vão sair */}
             <div className="border border-border rounded-lg p-3 bg-background">
-              <p className="text-sm font-medium text-foreground mb-2">Pessoas que serão afetadas:</p>
+              <p className="text-sm font-medium text-foreground mb-2">Pessoas que terão saída registrada:</p>
               <div className="max-h-32 overflow-y-auto space-y-1">
-                {pessoasDentro.slice(0, 10).map((pessoa, index) => (
+                {pessoasDentro.filter(p => !pessoasProtegidas.has(p.movimentacaoId)).slice(0, 10).map((pessoa, index) => (
                   <div key={pessoa.movimentacaoId} className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>{index + 1}. {pessoa.pessoa.nome}</span>
                     <span className="text-primary font-medium">{formatHora(pessoa.entradaEm)}</span>
                   </div>
                 ))}
-                {pessoasDentro.length > 10 && (
+                {(pessoasDentro.length - pessoasProtegidas.size) > 10 && (
                   <div className="text-xs text-muted-foreground text-center pt-1 border-t border-border">
-                    +{pessoasDentro.length - 10} pessoa{pessoasDentro.length - 10 > 1 ? 's' : ''}...
+                    +{pessoasDentro.length - pessoasProtegidas.size - 10} pessoa{pessoasDentro.length - pessoasProtegidas.size - 10 > 1 ? 's' : ''}...
                   </div>
                 )}
               </div>
@@ -507,12 +561,12 @@ export function RegistrarSaidaEmLoteModal({ open, onOpenChange, pessoasDentro }:
             <Button 
               onClick={async () => {
                 try {
+                  // Registrar saída APENAS para pessoas NÃO protegidas
+                  const pessoasASair = pessoasDentro.filter(p => !pessoasProtegidas.has(p.movimentacaoId));
                   
-                  // Registrar saída para todas as pessoas
-                  for (const pessoa of pessoasDentro) {
+                  for (const pessoa of pessoasASair) {
                     await handleRegistrarSaida(pessoa.movimentacaoId);
                   }
-                  
                   
                   // Fechar modais
                   setConfirmandoSaidaLote(false);

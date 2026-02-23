@@ -93,15 +93,15 @@ export function Dashboard() {
     return Math.ceil(totalItems / pageSize);
   };
 
-  // Monitoramento automático de 8 horas
+  // Monitoramento automático de 30 dias (720 horas)
   useEffect(() => {
     if (!empresaAtual) return;
 
     const verificarTempoPermanencia = async () => {
       try {
 
-        // Executar saída automática para quem ultrapassou 8 horas
-        const pessoasRemovidas = await marinaService.executarSaidaAutomatica(empresaAtual.id, 8);
+        // Executar saída automática para quem ultrapassou 30 dias (720 horas)
+        const pessoasRemovidas = await marinaService.executarSaidaAutomatica(empresaAtual.id, 720);
 
         if (pessoasRemovidas > 0) {
         }
@@ -307,11 +307,12 @@ export function Dashboard() {
                             </div>
                           </td>
                           <td className="py-4 px-5 hidden lg:table-cell text-center">
-                            {item.pessoa.placa ? (
+                            {/* Usa a placa da movimentação se existir, senão usa a placa da pessoa */}
+                            {(item.placa || item.pessoa.placa) ? (
                               <div className="flex items-center justify-center gap-2 text-sm">
                                 <Car className="h-3.5 w-3.5 text-black" />
                                 <span className="font-mono bg-muted px-2 py-0.5 rounded text-xs">
-                                  {formatters.placa(item.pessoa.placa)}
+                                  {formatters.placa(item.placa || item.pessoa.placa || '')}
                                 </span>
                               </div>
                             ) : (

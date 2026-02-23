@@ -7,9 +7,11 @@ import { Label } from '@/components/ui/label';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useMarina } from '@/contexts/MarinaContext';
 import { MovimentacaoComPessoa, PessoaDentro } from '@/types/marina';
-import { FileText, LogIn, LogOut, Users, Edit, Trash2 } from 'lucide-react';
+import { FileText, LogIn, LogOut, Users, Edit, Trash2, Plus, Car } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { getPlacasPorPessoa, adicionarPlacaPessoa, PlacaPessoa } from '@/services/marinaService';
+import { toast } from 'sonner';
 
 // Type guards for union type handling
 const isMovimentacaoComPessoa = (m: MovimentacaoComPessoa | PessoaDentro): m is MovimentacaoComPessoa => {
@@ -27,21 +29,34 @@ interface EditarMovimentacaoModalProps {
 }
 
 export function EditarMovimentacaoModal({ open, onOpenChange, movimentacao }: EditarMovimentacaoModalProps) {
-  const { atualizarMovimentacao, excluirMovimentacao, atualizarPessoa } = useMarina();
+  const { atualizarMovimentacao, excluirMovimentacao } = useMarina();
+  
+  // Estados do formulário
   const [formData, setFormData] = useState({
     entrada_em: '',
     saida_em: '',
     observacao: '',
-    placa: '',
   });
-  const [placaOriginal, setPlacaOriginal] = useState('');
+  
+  // Estados de placa (chips/botões)
+  const [placasPessoa, setPlacasPessoa] = useState<PlacaPessoa[]>([]);
+  const [placaSelecionada, setPlacaSelecionada] = useState<string>('');
+  const [novaPlaca, setNovaPlaca] = useState<string>('');
+  const [showNovaPlaca, setShowNovaPlaca] = useState<boolean>(false);
+  const [isLoadingPlacas, setIsLoadingPlacas] = useState<boolean>(false);
+  const [isAddingPlaca, setIsAddingPlaca] = useState<boolean>(false);
+  
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Preencher formulário com dados da movimentação
   useEffect(() => {
     if (!movimentacao) {
-      setFormData({ entrada_em: '', saida_em: '', observacao: '', placa: '' });
+      setFormData({ entrada_em: '', saida_em: '', observacao: '' });
+      setPlacasPessoa([]);
+      setPlacaSelecionada('');
+      setShowNovaPlaca(false);
+      setNovaPlaca('');
       return;
     }
 
@@ -50,12 +65,14 @@ export function EditarMovimentacaoModal({ open, onOpenChange, movimentacao }: Ed
     let saidaDate: string | null = null;
     let observacao: string | null = null;
     let pessoa: PessoaDentro['pessoa'] | MovimentacaoComPessoa['pessoa'] | null = null;
+    let placaMovimentacao: string | null = null;
 
     if (isMovimentacaoComPessoa(movimentacao)) {
       entradaDate = movimentacao.entrada_em;
       saidaDate = movimentacao.saida_em || null;
       observacao = movimentacao.observacao || null;
       pessoa = movimentacao.pessoa;
+      placaMovimentacao = movimentacao.placa || null;
     } else if (isPessoaDentro(movimentacao)) {
       entradaDate = movimentacao.entradaEm;
       saidaDate = null; // PessoaDentro não tem saida_em
@@ -79,21 +96,83 @@ export function EditarMovimentacaoModal({ open, onOpenChange, movimentacao }: Ed
         }
       }
 
-      const placaPessoa = pessoa?.placa || '';
-
       setFormData({
         entrada_em: entradaFormatted,
         saida_em: saidaFormatted,
         observacao: observacao || '',
-        placa: placaPessoa,
       });
-      setPlacaOriginal(placaPessoa);
+      
+      // Buscar placas da pessoa
+      if (pessoa) {
+        carregarPlacasPessoa(pessoa.id, placaMovimentacao);
+      }
+      
       setErrors({});
-    } else if (!movimentacao) {
-      // Reset form when closed
-      setFormData({ entrada_em: '', saida_em: '', observacao: '', placa: '' });
     }
   }, [movimentacao, open]);
+
+  // Função para carregar placas da pessoa
+  const carregarPlacasPessoa = async (pessoaId: string, placaMovimentacao: string | null) => {
+    setIsLoadingPlacas(true);
+    try {
+      const placas = await getPlacasPorPessoa(pessoaId);
+      setPlacasPessoa(placas);
+      
+      // Se a movimentação tem placa salva, usar ela
+      // Caso contrário, usar a primeira placa disponível ou vazio
+      if (placaMovimentacao) {
+        setPlacaSelecionada(placaMovimentacao);
+      } else if (placas.length > 0) {
+        setPlacaSelecionada(placas[0].placa);
+      } else {
+        setPlacaSelecionada('');
+      }
+    } catch (error) {
+      console.error('Erro ao carregar placas:', error);
+    } finally {
+      setIsLoadingPlacas(false);
+    }
+  };
+
+  // Função para adicionar nova placa
+  const handleAdicionarNovaPlaca = async () => {
+    if (!novaPlaca.trim() || !movimentacao) return;
+    
+    // Encontrar o ID da pessoa
+    let pessoaId: string | null = null;
+    if (isMovimentacaoComPessoa(movimentacao)) {
+      pessoaId = movimentacao.pessoa.id;
+    } else if (isPessoaDentro(movimentacao)) {
+      pessoaId = movimentacao.pessoa.id;
+    }
+    
+    if (!pessoaId) return;
+    
+    setIsAddingPlaca(true);
+    try {
+      const placaAdicionada = await adicionarPlacaPessoa(pessoaId, novaPlaca);
+      
+      if (placaAdicionada) {
+        // Recarregar placas
+        const placas = await getPlacasPorPessoa(pessoaId);
+        setPlacasPessoa(placas);
+        
+        // Selecionar a nova placa
+        setPlacaSelecionada(placaAdicionada.placa);
+        
+        // Limpar e fechar input
+        setNovaPlaca('');
+        setShowNovaPlaca(false);
+        
+        toast.success('Placa adicionada com sucesso!');
+      }
+    } catch (error) {
+      console.error('Erro ao adicionar placa:', error);
+      toast.error('Erro ao adicionar placa');
+    } finally {
+      setIsAddingPlaca(false);
+    }
+  };
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -127,35 +206,34 @@ export function EditarMovimentacaoModal({ open, onOpenChange, movimentacao }: Ed
     if (!validate() || !movimentacao) return;
 
     let movimentacaoId: string;
-    let pessoa: PessoaDentro['pessoa'] | MovimentacaoComPessoa['pessoa'] | null = null;
 
     if (isMovimentacaoComPessoa(movimentacao)) {
       movimentacaoId = movimentacao.id;
-      pessoa = movimentacao.pessoa;
     } else {
       movimentacaoId = movimentacao.movimentacaoId;
-      pessoa = movimentacao.pessoa;
     }
 
+    // Atualiza movimentação com a placa selecionada (NUNCA altera tabela de pessoas)
     await atualizarMovimentacao(movimentacaoId, {
       entrada_em: new Date(formData.entrada_em).toISOString(),
       saida_em: formData.saida_em ? new Date(formData.saida_em).toISOString() : undefined,
       observacao: formData.observacao.trim() || undefined,
+      placa: placaSelecionada || undefined,
     });
 
-    // Atualizar placa da pessoa se foi alterada
-    if (pessoa && formData.placa !== placaOriginal) {
-      await atualizarPessoa(pessoa.id, { placa: formData.placa });
-    }
-
-    setFormData({ entrada_em: '', saida_em: '', observacao: '', placa: '' });
-    setPlacaOriginal('');
+    setFormData({ entrada_em: '', saida_em: '', observacao: '' });
+    setPlacasPessoa([]);
+    setPlacaSelecionada('');
     setErrors({});
     onOpenChange(false);
   };
 
   const handleClose = () => {
-    setFormData({ entrada_em: '', saida_em: '', observacao: '', placa: '' });
+    setFormData({ entrada_em: '', saida_em: '', observacao: '' });
+    setPlacasPessoa([]);
+    setPlacaSelecionada('');
+    setShowNovaPlaca(false);
+    setNovaPlaca('');
     setErrors({});
     onOpenChange(false);
   };
@@ -208,20 +286,149 @@ export function EditarMovimentacaoModal({ open, onOpenChange, movimentacao }: Ed
             </div>
           )}
 
-          {/* Placa */}
+          {/* Placa - Interface de Chips/Botões */}
           <div className="space-y-2">
-            <Label htmlFor="placa" className="flex items-center gap-2 text-sm font-medium">
+            <Label className="flex items-center gap-2 text-sm font-medium">
+              <Car className="h-4 w-4" />
               Placa do Veículo
             </Label>
-            <Input
-              id="placa"
-              type="text"
-              value={formData.placa}
-              onChange={(e) => handleChange('placa', e.target.value.toUpperCase())}
-              placeholder="ABC-1234"
-              maxLength={8}
-              className="h-11 uppercase"
-            />
+            
+            {isLoadingPlacas ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                Carregando placas...
+              </div>
+            ) : placasPessoa.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {placasPessoa.map((placa) => (
+                  <button
+                    key={placa.id}
+                    type="button"
+                    onClick={() => setPlacaSelecionada(placa.placa)}
+                    className={cn(
+                      "px-3 py-2 rounded-lg text-sm font-mono font-medium transition-all duration-200 border-2",
+                      placaSelecionada === placa.placa
+                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                        : "bg-background border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-foreground"
+                    )}
+                  >
+                    {placa.placa}
+                  </button>
+                ))}
+                
+                {/* Botão Nova Placa */}
+                {!showNovaPlaca ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowNovaPlaca(true)}
+                    className="px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 border-2 border-dashed border-slate-300 hover:border-slate-400 hover:bg-slate-50 text-slate-600 flex items-center gap-1"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Nova Placa
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="text"
+                      value={novaPlaca}
+                      onChange={(e) => {
+                        let value = e.target.value.toUpperCase();
+                        // Formatar como placa (ABC-1234)
+                        value = value.replace(/[^a-zA-Z0-9]/g, '');
+                        if (value.length >= 3 && !value.includes('-')) {
+                          value = value.substring(0, 3) + '-' + value.substring(3, 7);
+                        }
+                        setNovaPlaca(value.substring(0, 8));
+                      }}
+                      placeholder="ABC-1234"
+                      maxLength={8}
+                      className="h-10 w-28 text-sm font-mono uppercase"
+                      disabled={isAddingPlaca}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleAdicionarNovaPlaca}
+                      disabled={novaPlaca.length < 7 || isAddingPlaca}
+                      className="h-10"
+                    >
+                      {isAddingPlaca ? (
+                        <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        'Add'
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setShowNovaPlaca(false);
+                        setNovaPlaca('');
+                      }}
+                      className="h-10 px-2"
+                    >
+                      ✕
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground py-2">
+                Nenhuma placa cadastrada
+                <button
+                  type="button"
+                  onClick={() => setShowNovaPlaca(true)}
+                  className="ml-2 text-primary hover:underline"
+                >
+                  Adicionar placa
+                </button>
+              </div>
+            )}
+            
+            {showNovaPlaca && placasPessoa.length > 0 && (
+              <div className="flex items-center gap-1 mt-2">
+                <Input
+                  type="text"
+                  value={novaPlaca}
+                  onChange={(e) => {
+                    let value = e.target.value.toUpperCase();
+                    value = value.replace(/[^a-zA-Z0-9]/g, '');
+                    if (value.length >= 3 && !value.includes('-')) {
+                      value = value.substring(0, 3) + '-' + value.substring(3, 7);
+                    }
+                    setNovaPlaca(value.substring(0, 8));
+                  }}
+                  placeholder="ABC-1234"
+                  maxLength={8}
+                  className="h-10 w-28 text-sm font-mono uppercase"
+                  disabled={isAddingPlaca}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleAdicionarNovaPlaca}
+                  disabled={novaPlaca.length < 7 || isAddingPlaca}
+                >
+                  {isAddingPlaca ? (
+                    <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    'Adicionar'
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setShowNovaPlaca(false);
+                    setNovaPlaca('');
+                  }}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            )}
           </div>
 
 

@@ -1,6 +1,9 @@
 -- get_movimentacoes_por_empresa.sql
 -- Função RPC para buscar movimentações com paginação, contornando limite de 1000 registros
 
+-- Primeiro, dropar a função existente para evitar erro de tipo de retorno
+DROP FUNCTION IF EXISTS get_movimentacoes_por_empresa(TEXT, INTEGER, INTEGER);
+
 CREATE OR REPLACE FUNCTION get_movimentacoes_por_empresa(
   p_empresa_id TEXT,
   p_limit INTEGER DEFAULT 1000,
@@ -15,7 +18,8 @@ RETURNS TABLE (
   status TEXT,
   observacao TEXT,
   excluido_em TIMESTAMPTZ,
-  created_at TIMESTAMPTZ
+  created_at TIMESTAMPTZ,
+  placa TEXT
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -31,7 +35,8 @@ BEGIN
     m.status,
     m.observacao,
     m.excluido_em,
-    m.created_at
+    m.created_at,
+    m.placa
   FROM movimentacoes m
   WHERE m.empresa_id = p_empresa_id
     AND m.excluido_em IS NULL

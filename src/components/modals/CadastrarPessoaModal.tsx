@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { useMarina } from '@/contexts/MarinaContext';
 import { FileText, Phone, Car, Users, Gift, Ship, Briefcase } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { validateCPF, validateRG, validatePlaca, formatName, formatPhone, formatPlaca } from '@/lib/validation';
+import { validateCPF, validateRG, validatePlaca, validateDocument, detectDocumentType, formatName, formatPhone, formatPlaca } from '@/lib/validation';
 
 interface CadastrarPessoaModalProps {
   open: boolean;
@@ -28,20 +28,40 @@ export function CadastrarPessoaModal({ open, onOpenChange, onCadastrarERegistrar
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showSuccessOptions, setShowSuccessOptions] = useState(false);
   const [lastPessoaCadastrada, setLastPessoaCadastrada] = useState<{ id: string; nome: string } | null>(null);
+  const [documentType, setDocumentType] = useState<'cpf' | 'rg' | 'outro' | null>(null);
 
   const handleChange = (field: string, value: string) => {
     let processedValue = value;
     
     // Processamento específico para cada campo
     if (field === 'documento') {
-      // Manter o valor bruto para validação, mas permitir formatação visual
-      processedValue = value;
+      // Detectar tipo de documento e formatar automaticamente
+      const detectedType = detectDocumentType(value);
+      setDocumentType(detectedType);
+      
+      if (detectedType === 'cpf') {
+        // Formatar CPF: 123.456.789-01
+        const numericOnly = value.replace(/\D/g, '');
+        if (numericOnly.length <= 11) {
+          processedValue = numericOnly.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4').replace(/\.$/, '').replace(/\.$/, '').replace(/-$/, '');
+        }
+      } else if (detectedType === 'rg') {
+        // Formatar RG: 12.345.678-9
+        const numericOnly = value.replace(/\D/g, '');
+        if (numericOnly.length >= 4 && numericOnly.length <= 10) {
+          processedValue = numericOnly.replace(/(\d{2})(\d{3})(\d{3})(\d{1})/, '$1.$2.$3-$4').replace(/\.$/, '').replace(/\.$/, '').replace(/-$/, '');
+        }
+      } else {
+        // Outros documentos: converter para maiúsculas
+        processedValue = value.toUpperCase();
+      }
     } else if (field === 'contato') {
       processedValue = value.replace(/\D/g, '');
     } else if (field === 'placa') {
       processedValue = value.toUpperCase();
+    } else if (field === 'tipo') {
+      processedValue = value.toUpperCase();
     }
-    // Removido o processamento do campo de nome para permitir digitação normal
     
     setFormData(prev => ({ ...prev, [field]: processedValue }));
     if (errors[field]) {
@@ -57,14 +77,13 @@ export function CadastrarPessoaModal({ open, onOpenChange, onCadastrarERegistrar
     if (!formData.documento.trim()) {
       newErrors.documento = 'Documento é obrigatório';
     } else {
-      // Validar formato do documento (CPF ou RG)
+      // Usar validação inteligente: CPF valida algoritmo, RG/outros apenas aceitam
       const documentoValue = formData.documento.trim();
-      const cpfValidation = validateCPF(documentoValue);
-      const rgValidation = validateRG(documentoValue);
+      const docValidation = validateDocument(documentoValue);
       
-      // Se não for um CPF válido e não for um RG válido, marcar como erro
-      if (!cpfValidation.isValid && !rgValidation.isValid) {
-        newErrors.documento = 'Documento inválido. Por favor, insira um CPF ou RG válido.';
+      // CPF precisa ser válido
+      if (docValidation.type === 'cpf' && !docValidation.isValid) {
+        newErrors.documento = 'CPF inválido. Por favor, insira um CPF válido.';
       }
       
       // Verificar se pessoa com este documento já existe na empresa atual

@@ -11,7 +11,8 @@ import {
 import { Pessoa } from '@/types/marina';
 
 export function getIconForUserType(tipo?: string | null) {
-  switch (tipo) {
+  const tipoLower = tipo?.toLowerCase();
+  switch (tipoLower) {
     case 'cliente':
       return Users;
     case 'visita':
@@ -30,7 +31,8 @@ export function getIconForUserType(tipo?: string | null) {
 }
 
 export function getColorForUserType(tipo?: string | null) {
-  switch (tipo) {
+  const tipoLower = tipo?.toLowerCase();
+  switch (tipoLower) {
     case 'cliente':
       return 'text-blue-600';
     case 'visita':
@@ -49,7 +51,8 @@ export function getColorForUserType(tipo?: string | null) {
 }
 
 export function getBgColorForUserType(tipo?: string | null) {
-  switch (tipo) {
+  const tipoLower = tipo?.toLowerCase();
+  switch (tipoLower) {
     case 'cliente':
       return 'bg-blue-100';
     case 'visita':

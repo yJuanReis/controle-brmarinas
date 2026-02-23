@@ -130,12 +130,11 @@ export function HistoricoPage() {
     
     const termo = globalSearch.toLowerCase().trim();
     return dadosBrutos.filter(mov => {
-      // Busca em campos relevantes - inclui a placa da movimentação (mov.placa)
+      // Busca em campos relevantes
       const campos = [
         mov.pessoa.nome,
         mov.pessoa.documento,
         mov.pessoa.placa,
-        mov.placa,  // Placa da movimentação
         mov.pessoa.contato,
         mov.pessoa.tipo,
         mov.observacao
@@ -610,12 +609,11 @@ export function HistoricoPage() {
                                       </div>
                                     )}
 
-                                    {/* Exibe a placa da movimentação se existir, senão a placa da pessoa */}
                                     {(mov.placa || mov.pessoa.placa) && (
                                       <div className="flex items-center gap-2">
                                         <Car className="h-3 w-3 text-black" />
                                         <span className="font-mono bg-muted px-2 py-0.5 rounded text-xs">
-                                          {formatters.placa(mov.placa || mov.pessoa.placa)}
+                                          {formatters.placa(mov.placa || mov.pessoa.placa || '')}
                                         </span>
                                       </div>
                                     )}
@@ -838,12 +836,11 @@ export function HistoricoPage() {
                                 </div>
                               </td>
                               <td className="py-4 px-5 hidden lg:table-cell">
-                                {/* Exibe a placa da movimentação se existir, senão a placa da pessoa */}
                                 {(mov.placa || mov.pessoa.placa) ? (
                                   <div className="flex items-center gap-2 text-sm">
                                     <Car className="h-3.5 w-3.5 text-black" />
                                     <span className="font-mono bg-muted px-2 py-0.5 rounded text-xs">
-                                      {formatters.placa(mov.placa || mov.pessoa.placa)}
+                                      {formatters.placa(mov.placa || mov.pessoa.placa || '')}
                                     </span>
                                   </div>
                                 ) : (

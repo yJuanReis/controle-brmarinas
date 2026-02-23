@@ -280,6 +280,69 @@ export class MarinaService {
     }
   }
 
+
+  /**
+   * Busca movimentações completas por período usando RPC otimizado
+   * Busca tudo em uma única query: movimentações + dados da pessoa + placas extras
+   *MUITO mais rápido que fazer múltiplas requisições
+   * @param empresaId ID da empresa
+   * @param dataInicio Data/hora de início do período
+   * @param dataFim Data/hora de fim do período
+   * @param incluirExcluidas Se true, inclui movimentações marcadas como excluídas
+   * @returns Lista de movimentações completas no período
+   */
+  public async getMovimentacoesCompletasPorPeriodo(
+    empresaId: string,
+    dataInicio: string,
+    dataFim: string,
+    incluirExcluidas: boolean = false
+  ): Promise<MovimentacaoCompleta[]> {
+    try {
+      console.log(`[MarinaService] Buscando movimentações completas via RPC para empresa ${empresaId}`);
+      console.log(`[MarinaService] Período: ${dataInicio} até ${dataFim}`);
+
+      const BATCH_SIZE = 1000;
+      let offset = 0;
+      let todasMovimentacoes: MovimentacaoCompleta[] = [];
+      let temMaisRegistros = true;
+
+      // Fazer requisições sequenciais até não haver mais registros
+      while (temMaisRegistros) {
+        const { data, error } = await supabase
+          .rpc('get_movimentacoes_completo', {
+            p_empresa_id: empresaId,
+            p_data_inicio: dataInicio,
+            p_data_fim: dataFim,
+            p_limit: BATCH_SIZE,
+            p_offset: offset,
+            p_incluir_excluidas: incluirExcluidas
+          });
+
+        if (error) {
+          console.error('[MarinaService] Erro ao buscar movimentações completas via RPC:', JSON.stringify(error, null, 2));
+          throw error;
+        }
+
+        const batch = data || [];
+        console.log(`[MarinaService] Batch completo offset ${offset}: ${batch.length} registros`);
+
+        if (batch.length === 0 || batch.length < BATCH_SIZE) {
+          todasMovimentacoes = [...todasMovimentacoes, ...batch];
+          temMaisRegistros = false;
+        } else {
+          todasMovimentacoes = [...todasMovimentacoes, ...batch];
+          offset += BATCH_SIZE;
+        }
+      }
+
+      console.log(`[MarinaService] Total de movimentações completas encontradas: ${todasMovimentacoes.length}`);
+      return todasMovimentacoes;
+    } catch (error) {
+      console.error('[MarinaService] Erro ao buscar movimentações completas por período:', error);
+      throw error;
+    }
+  }
+
   /**
    * Busca movimentações por período usando RPC com paginação
    * Esta função contorna o limite de 1000 registros do Supabase
@@ -394,5 +457,154 @@ export class MarinaService {
   }
 }
 
+// Interface para dados completos de movimentação (com pessoa e placas)
+export interface MovimentacaoCompleta {
+  id: string;
+  empresa_id: string;
+  pessoa_id: string;
+  entrada_em: string;
+  saida_em: string | null;
+  status: string;
+  observacao: string | null;
+  placa: string | null;
+  pernoite: boolean | null;
+  dias_pernoite: number | null;
+  excluido_em: string | null;
+  created_at: string;
+  pessoa_nome: string;
+  pessoa_documento: string;
+  pessoa_tipo: string;
+  pessoa_contato: string;
+  pessoa_placa: string;
+  placas_extras: string[];
+}
+
 // Exportar instância única
 export const marinaService = MarinaService.getInstance();
+
+/**
+ * Interface para placa de pessoa
+ */
+export interface PlacaPessoa {
+  id: string;
+  pessoa_id: string;
+  placa: string;
+  created_at: string;
+}
+
+/**
+ * Busca todas as placas de uma pessoa
+ * @param pessoaId ID da pessoa
+ * @returns Lista de placas
+ */
+export async function getPlacasPorPessoa(pessoaId: string): Promise<PlacaPessoa[]> {
+  try {
+    const { data, error } = await supabase
+      .from('placas_pessoa')
+      .select('*')
+      .eq('pessoa_id', pessoaId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('[marinaService] Erro ao buscar placas:', error);
+      throw error;
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('[marinaService] Erro ao buscar placas por pessoa:', error);
+    return [];
+  }
+}
+
+/**
+ * Adiciona uma nova placa para uma pessoa
+ * @param pessoaId ID da pessoa
+ * @param placa Placa do veículo
+ * @returns Placa criada
+ */
+export async function adicionarPlacaPessoa(pessoaId: string, placa: string): Promise<PlacaPessoa | null> {
+  try {
+    // Normalizar placa (uppercase, sem espaços extras)
+    const placaNormalizada = placa.toUpperCase().trim();
+
+    const { data, error } = await supabase
+      .from('placas_pessoa')
+      .insert({
+        pessoa_id: pessoaId,
+        placa: placaNormalizada,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      // Se for conflito (placa já existe), buscar a placa existente
+      if (error.code === '23505' || error.message.includes('duplicate')) {
+        const { data: existingPlaca } = await supabase
+          .from('placas_pessoa')
+          .select('*')
+          .eq('pessoa_id', pessoaId)
+          .eq('placa', placaNormalizada)
+          .single();
+        
+        return existingPlaca;
+      }
+      console.error('[marinaService] Erro ao adicionar placa:', error);
+      throw error;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('[marinaService] Erro ao adicionar placa:', error);
+    return null;
+  }
+}
+
+/**
+ * Verifica diretamente no banco se uma pessoa está dentro da marina
+ * Esta função é mais robusta que a verificação em memória pois consulta o banco diretamente
+ * @param pessoaId ID da pessoa
+ * @param empresaId ID da empresa
+ * @returns Objeto com informações sobre a movimentação ativa, ou null se não houver
+ */
+export async function verificarPessoaEstaDentro(pessoaId: string, empresaId: string): Promise<{
+  estaDentro: boolean;
+  movimentacaoId?: string;
+  entradaEm?: string;
+  observacao?: string;
+  placa?: string;
+  pernoite?: boolean;
+  diasPernoite?: number;
+} | null> {
+  try {
+    const { data, error } = await supabase
+      .from('movimentacoes')
+      .select('id, entrada_em, observacao, placa, pernoite, dias_pernoite')
+      .eq('pessoa_id', pessoaId)
+      .eq('empresa_id', empresaId)
+      .eq('status', 'DENTRO')
+      .single();
+
+    if (error) {
+      // Se não encontrar movimentação, a pessoa não está dentro
+      if (error.code === 'PGRST116') {
+        return { estaDentro: false };
+      }
+      console.error('[marinaService] Erro ao verificar pessoa dentro:', error);
+      return null;
+    }
+
+    return {
+      estaDentro: true,
+      movimentacaoId: data.id,
+      entradaEm: data.entrada_em,
+      observacao: data.observacao,
+      placa: data.placa,
+      pernoite: data.pernoite,
+      diasPernoite: data.dias_pernoite,
+    };
+  } catch (error) {
+    console.error('[marinaService] Erro ao verificar pessoa dentro:', error);
+    return null;
+  }
+}

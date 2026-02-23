@@ -24,8 +24,8 @@ export function SaidaAutomaticaButton({ className }: SaidaAutomaticaButtonProps)
     try {
       setIsExecuting(true);
       
-      // Executar saída automática com 13 horas de limite
-      const pessoasRemovidas = await marinaService.executarSaidaAutomatica(empresaAtual.id, 13);
+      // Executar saída automática com 30 dias (720 horas) de limite
+      const pessoasRemovidas = await marinaService.executarSaidaAutomatica(empresaAtual.id, 720);
       
       if (pessoasRemovidas > 0) {
         toast.success(
@@ -48,7 +48,7 @@ export function SaidaAutomaticaButton({ className }: SaidaAutomaticaButtonProps)
         }
       } else {
         toast.info(
-          'Nenhuma pessoa ultrapassou o limite de 13 horas de permanência.',
+          'Nenhuma pessoa ultrapassou o limite de 30 dias de permanência.',
           {
             duration: 3000,
             icon: <Clock className="h-4 w-4" />

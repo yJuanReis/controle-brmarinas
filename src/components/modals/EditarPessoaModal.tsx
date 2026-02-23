@@ -8,7 +8,7 @@ import { useMarina } from '@/contexts/MarinaContext';
 import { Pessoa } from '@/types/marina';
 import { FileText, Phone, Car, Users, Gift, Ship, Briefcase } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { validateCPF, validateRG, validatePlaca } from '@/lib/validation';
+import { validateCPF, validateRG, validatePlaca, validateDocument, detectDocumentType } from '@/lib/validation';
 
 type TipoPessoa = 'cliente' | 'visita' | 'marinheiro' | 'proprietario' | 'colaborador' | 'prestador' | '';
 
@@ -28,6 +28,7 @@ export function EditarPessoaModal({ open, onOpenChange, pessoa }: EditarPessoaMo
     placa: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [documentType, setDocumentType] = useState<'cpf' | 'rg' | 'outro' | null>(null);
 
   // Preencher formulário com dados da pessoa
   useEffect(() => {
@@ -44,7 +45,39 @@ export function EditarPessoaModal({ open, onOpenChange, pessoa }: EditarPessoaMo
   }, [pessoa, open]);
 
   const handleChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    let processedValue = value;
+    
+    // Processamento específico para cada campo
+    if (field === 'documento') {
+      // Detectar tipo de documento e formatar automaticamente
+      const detectedType = detectDocumentType(value);
+      setDocumentType(detectedType);
+      
+      if (detectedType === 'cpf') {
+        // Formatar CPF: 123.456.789-01
+        const numericOnly = value.replace(/\D/g, '');
+        if (numericOnly.length <= 11) {
+          processedValue = numericOnly.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4').replace(/\.$/, '').replace(/\.$/, '').replace(/-$/, '');
+        }
+      } else if (detectedType === 'rg') {
+        // Formatar RG: 12.345.678-9
+        const numericOnly = value.replace(/\D/g, '');
+        if (numericOnly.length >= 4 && numericOnly.length <= 10) {
+          processedValue = numericOnly.replace(/(\d{2})(\d{3})(\d{3})(\d{1})/, '$1.$2.$3-$4').replace(/\.$/, '').replace(/\.$/, '').replace(/-$/, '');
+        }
+      } else {
+        // Outros documentos: converter para maiúsculas
+        processedValue = value.toUpperCase();
+      }
+    } else if (field === 'contato') {
+      processedValue = value.replace(/\D/g, '');
+    } else if (field === 'placa') {
+      processedValue = value.toUpperCase();
+    } else if (field === 'tipo') {
+      processedValue = value.toUpperCase();
+    }
+    
+    setFormData(prev => ({ ...prev, [field]: processedValue }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
@@ -57,6 +90,22 @@ export function EditarPessoaModal({ open, onOpenChange, pessoa }: EditarPessoaMo
     }
     if (!formData.documento.trim()) {
       newErrors.documento = 'Documento é obrigatório';
+    } else {
+      // Usar validação inteligente: CPF valida algoritmo, RG/outros apenas aceitam
+      const documentoValue = formData.documento.trim();
+      const docValidation = validateDocument(documentoValue);
+      
+      // CPF precisa ser válido
+      if (docValidation.type === 'cpf' && !docValidation.isValid) {
+        newErrors.documento = 'CPF inválido. Por favor, insira um CPF válido.';
+      }
+    }
+    if (formData.placa.trim()) {
+      // Validar formato da placa
+      const placaValidation = validatePlaca(formData.placa.trim());
+      if (!placaValidation.isValid) {
+        newErrors.placa = 'Placa inválida. Por favor, insira uma placa no formato ABC-1234 ou ABC-1D23.';
+      }
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;

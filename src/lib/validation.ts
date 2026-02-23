@@ -46,6 +46,29 @@ export function validateCPF(value: string): { isValid: boolean; formatted: strin
 }
 
 /**
+ * Detecta o tipo de documento baseado no formato
+ * @param value Valor a ser analisado
+ * @returns Tipo do documento: 'cpf', 'rg', ou 'outro'
+ */
+export function detectDocumentType(value: string): 'cpf' | 'rg' | 'outro' {
+  // Remove caracteres não alfanuméricos para análise
+  const cleanValue = value.replace(/[^a-zA-Z0-9]/g, '');
+  
+  // CPF: exatamente 11 dígitos numéricos
+  if (/^\d{11}$/.test(cleanValue)) {
+    return 'cpf';
+  }
+  
+  // RG: entre 4 e 10 dígitos numéricos (formato comum no Brasil)
+  // Aceita formatos como: 12345678, 12.345.678, 12345678-9, etc.
+  if (/^\d{4,10}$/.test(cleanValue)) {
+    return 'rg';
+  }
+  
+  return 'outro';
+}
+
+/**
  * Valida RG (formato genérico)
  * @param value Valor a ser validado
  * @returns Objeto com validade e valor formatado
@@ -54,20 +77,69 @@ export function validateRG(value: string): { isValid: boolean; formatted: string
   // Remove caracteres especiais, mantendo apenas letras, números e espaços
   const cleanValue = value.replace(/[^a-zA-Z0-9\s]/g, '');
   
+  // RG deve ter pelo menos 4 caracteres
   if (cleanValue.length < 4) {
     return { isValid: false, formatted: value };
   }
 
-  // Formatação simples: adiciona pontos a cada 3 dígitos para números
+  // Verifica se tem pelo menos uma parte numérica
   const numericPart = cleanValue.replace(/\D/g, '');
-  let formatted = value;
+  if (numericPart.length < 4) {
+    return { isValid: false, formatted: value };
+  }
 
-  if (numericPart.length >= 4) {
-    // Formato: 12.345.678-9 (exemplo SP)
+  // RG válido: aceita qualquer combinação de letras e números com pelo menos 4 dígitos
+  // Formatação: tenta formatar como 12.345.678-9
+  let formatted = value;
+  if (numericPart.length >= 4 && numericPart.length <= 10) {
     formatted = numericPart.replace(/(\d{2})(\d{3})(\d{3})(\d{1})/, '$1.$2.$3-$4');
+    // Se a formatação não mudou muito, usa o valor original formatado
+    if (formatted === numericPart) {
+      formatted = cleanValue;
+    }
   }
 
   return { isValid: true, formatted };
+}
+
+/**
+ * Valida documento de forma inteligente
+ * - CPF: valida algoritmo de dígitos verificadores
+ * - RG e outros: apenas formata, não valida algoritmo
+ * @param value Valor a ser validado
+ * @returns Objeto com tipo, validade e valor formatado
+ */
+export function validateDocument(value: string): { 
+  type: 'cpf' | 'rg' | 'outro'; 
+  isValid: boolean; 
+  formatted: string 
+} {
+  const documentType = detectDocumentType(value);
+  
+  if (documentType === 'cpf') {
+    const cpfResult = validateCPF(value);
+    return {
+      type: 'cpf',
+      isValid: cpfResult.isValid,
+      formatted: cpfResult.formatted
+    };
+  }
+  
+  if (documentType === 'rg') {
+    const rgResult = validateRG(value);
+    return {
+      type: 'rg',
+      isValid: rgResult.isValid,
+      formatted: rgResult.formatted
+    };
+  }
+  
+  // Para outros documentos, apenas aceita e formata
+  return {
+    type: 'outro',
+    isValid: true,
+    formatted: value.toUpperCase()
+  };
 }
 
 /**

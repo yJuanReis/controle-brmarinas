@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useMarina } from '@/contexts/MarinaContext';
-import { marinaService } from '@/services/marinaService';
+import { marinaService, MovimentacaoCompleta } from '@/services/marinaService';
 import { endOfMonth, format, startOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import jsPDF from 'jspdf';
@@ -124,9 +124,9 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
         dataFimStr = `${filtros.dataFim}T${filtros.horaFim}:59`;
       }
 
-      // Buscar movimentações via RPC (contorna limite de 1000 registros)
-      // OPTIMIZED: Use streaming/chunks for large datasets
-      const movimentacoesFiltradas = await marinaService.getMovimentacoesPorPeriodo(
+      // Buscar movimentações completas via RPC otimizado (tudo em uma query)
+      // MUITO mais rápido - busc mov + dados pessoa + placas extras
+      const movimentacoesFiltradas: MovimentacaoCompleta[] = await marinaService.getMovimentacoesCompletasPorPeriodo(
         empresaAtual.id,
         dataInicioStr,
         dataFimStr,
@@ -150,26 +150,35 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
         });
       }
 
-      // Dados formatados para exportação
+      // Dados formatados para exportação - agora usando dados já incluídos na query
       const dadosExportacao = movimentacoesFiltradas.map((mov) => {
-        const pessoa = pessoas.find(p => p.id === mov.pessoa_id);
         const entradaDate = new Date(mov.entrada_em);
         const saidaDate = mov.saida_em ? new Date(mov.saida_em) : null;
+        
+        // Pegar placa: movimentação > pessoa > placas extras (já vem tudo na query)
+        let placaExibir = mov.placa || '';
+        if (!placaExibir && mov.pessoa_placa) {
+          placaExibir = mov.pessoa_placa;
+        }
+        // Se ainda não tiver, pegar a primeira placa extra do array
+        if (!placaExibir && mov.placas_extras && mov.placas_extras.length > 0) {
+          placaExibir = mov.placas_extras[0];
+        }
 
         return {
           dataEntrada: format(entradaDate, 'dd/MM/yyyy'),
           horaEntrada: format(entradaDate, 'HH:mm'),
           dataSaida: saidaDate ? format(saidaDate, 'dd/MM/yyyy') : '',
           horaSaida: saidaDate ? format(saidaDate, 'HH:mm') : '',
-          nome: pessoa?.nome || 'Pessoa não encontrada',
-          documento: pessoa?.documento || '',
-          tipo: pessoa?.tipo || '',
-          placa: pessoa?.placa || '',
+          nome: mov.pessoa_nome || 'Pessoa não encontrada',
+          documento: mov.pessoa_documento || '',
+          tipo: mov.pessoa_tipo || '',
+          contato: mov.pessoa_contato || '',
+          placa: placaExibir,
           observacao: mov.observacao || ''
         };
       });
-
-      const headers = ['Data Entrada', 'Hora Entrada', 'Data Saída', 'Hora Saída', 'Nome', 'Documento', 'Tipo', 'Placa', 'Observações'];
+      const headers = ['Data Entrada', 'Hora Entrada', 'Data Saída', 'Hora Saída', 'Nome', 'Documento', 'Tipo', 'Contato', 'Placa', 'Observações'];
 
       // Para relatórios de mês completo, usar horários fixos no cabeçalho
       const periodoInfo = isMonthFilter 
@@ -214,6 +223,7 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
         row.nome,
         row.documento,
         row.tipo,
+        row.contato,
         row.placa,
         row.observacao
       ];
@@ -247,6 +257,7 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
       row.nome,
       row.documento,
       row.tipo,
+      row.contato,
       row.placa,
       row.observacao
     ])];
@@ -307,6 +318,7 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
       row.nome,
       row.documento,
       row.tipo,
+      row.contato,
       row.placa,
       row.observacao
     ]);
@@ -324,11 +336,12 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
         1: { cellWidth: 12 },   // Hora Entrada
         2: { cellWidth: 18 },   // Data Saída
         3: { cellWidth: 12 },   // Hora Saída
-        4: { cellWidth: 45 },   // Nome
-        5: { cellWidth: 28 },   // Documento
-        6: { cellWidth: 25 },   // Tipo
-        7: { cellWidth: 20 },   // Placa
-        8: { cellWidth: 100 } // Observações - preenche restante
+        4: { cellWidth: 42 },   // Nome
+        5: { cellWidth: 25 },   // Documento
+        6: { cellWidth: 24 },   // Tipo
+        7: { cellWidth: 18 },   // Contato
+        8: { cellWidth: 16 },   // Placa
+        9: { cellWidth: 'auto' } // Observações - preenche restante
       },
       styles: { 
         fontSize: 7,
@@ -377,6 +390,7 @@ export function RelatoriosModal({ open, onOpenChange }: RelatoriosModalProps) {
           `Nome: ${row.nome}`,
           `Documento: ${row.documento}`,
           `Tipo: ${row.tipo}`,
+          `Contato: ${row.contato}`,
           `Placa: ${row.placa}`,
           `Observações: ${row.observacao}`,
           ''

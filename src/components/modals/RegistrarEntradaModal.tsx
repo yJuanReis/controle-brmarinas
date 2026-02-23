@@ -9,13 +9,16 @@ import { useMarina } from '@/contexts/MarinaContext';
 import { 
   LogIn, Search, FileText, Phone, Car, AlertCircle, 
   UserPlus, Edit2, X, Users, Gift, Ship, Briefcase, 
-  CheckCircle, XCircle, Save
+  CheckCircle, XCircle, Save, LogOut, Plus, Moon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UserTypeAvatar } from '@/lib/userTypeIcons';
 import { validateCPF, validateRG, validatePlaca } from '@/lib/validation';
 import { smartSearch } from '@/lib/utils';
 import { validators, formatters } from '@/lib/validation';
+import { getPlacasPorPessoa, adicionarPlacaPessoa, PlacaPessoa, verificarPessoaEstaDentro } from '@/services/marinaService';
+import { toast } from 'sonner';
+import { Switch } from '@/components/ui/switch';
 
 type TipoPessoa = 'cliente' | 'visita' | 'marinheiro' | 'proprietario' | 'colaborador' | 'prestador' | '';
 
@@ -38,13 +41,146 @@ export function RegistrarEntradaModal({
   onPessoaPreSelecionadaUsada,
   onAbrirCadastro
 }: RegistrarEntradaModalProps) {
-  const { pessoas, registrarEntrada, podeEntrar, atualizarPessoa } = useMarina();
+  const { pessoas, registrarEntrada, registrarSaida, podeEntrar, atualizarPessoa, movimentacoes, empresaAtual } = useMarina();
   
   // Estados
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPessoaId, setSelectedPessoaId] = useState<string | null>(null);
   const [observacao, setObservacao] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+  const [isRegistrandoSaida, setIsRegistrandoSaida] = useState(false);
+  const [isVerificandoBanco, setIsVerificandoBanco] = useState(false);
+  
+  // Paginação da lista
+  const [visibleCount, setVisibleCount] = useState(20);
+  const LOAD_MORE_COUNT = 50;
+  
+  // Estados de placas (chips/botões)
+  const [placasPessoa, setPlacasPessoa] = useState<PlacaPessoa[]>([]);
+  const [placaSelecionada, setPlacaSelecionada] = useState<string>('');
+  const [novaPlaca, setNovaPlaca] = useState<string>('');
+  const [showNovaPlaca, setShowNovaPlaca] = useState<boolean>(false);
+  const [isLoadingPlacas, setIsLoadingPlacas] = useState<boolean>(false);
+  const [isAddingPlaca, setIsAddingPlaca] = useState<boolean>(false);
+  
+  // Estados de pernoite
+  const [pernoite, setPernoite] = useState<boolean>(false);
+  const [diasPernoite, setDiasPernoite] = useState<number>(1);
+  
+  // Estado para movimentação ativa verificada no banco (mais robusta)
+  const [movimentacaoAtivaBanco, setMovimentacaoAtivaBanco] = useState<{
+    movimentacaoId: string;
+    entradaEm: string;
+    observacao?: string;
+    placa?: string;
+    pernoite?: boolean;
+    diasPernoite?: number;
+  } | null>(null);
+  
+  // Encontrar movimentação ativa da pessoa selecionada (usando dados locais)
+  const movimentacaoAtiva = useMemo(() => {
+    if (!selectedPessoaId) return null;
+    return movimentacoes.find(m => m.pessoa_id === selectedPessoaId && m.status === 'DENTRO') || null;
+  }, [selectedPessoaId, movimentacoes]);
+  
+  // Usar verificação do banco se disponível, caso contrário usar dados locais
+  const movimentacaoAtivaExibir = movimentacaoAtivaBanco || (movimentacaoAtiva ? {
+    movimentacaoId: movimentacaoAtiva.id,
+    entradaEm: movimentacaoAtiva.entrada_em,
+    observacao: movimentacaoAtiva.observacao,
+    placa: movimentacaoAtiva.placa,
+    pernoite: movimentacaoAtiva.pernoite,
+    diasPernoite: movimentacaoAtiva.dias_pernoite,
+  } : null);
+  
+  // Handler para registrar saída por esquecimento
+  const handleSaidaPorEsquecimento = async () => {
+    // Usar verificação do banco se disponível, caso contrário usar dados locais
+    const movimentacaoId = movimentacaoAtivaExibir?.movimentacaoId || movimentacaoAtiva?.id;
+    
+    if (!movimentacaoId) return;
+    
+    setIsRegistrandoSaida(true);
+    const result = await registrarSaida(
+      movimentacaoId,
+      undefined,
+      'Saída registrada por esquecimento ao tentar nova entrada'
+    );
+    
+    if (result.success) {
+      // Limpar estado de verificação do banco
+      setMovimentacaoAtivaBanco(null);
+      // Limpar observação para permitir nova entrada
+      setObservacao('');
+    }
+    setIsRegistrandoSaida(false);
+  };
+  
+  // Função para carregar placas da pessoa
+  const carregarPlacasPessoa = async (pessoaId: string, placaPrincipal?: string) => {
+    setIsLoadingPlacas(true);
+    try {
+      const placas = await getPlacasPorPessoa(pessoaId);
+      
+      // Se a pessoa tem placa principal e ela não está na lista de placas extras,
+      // adicionar temporariamente para exibir como opção selecionável
+      let placasExibir = [...placas];
+      if (placaPrincipal && !placas.some(p => p.placa === placaPrincipal)) {
+        placasExibir.unshift({
+          id: 'principal',
+          pessoa_id: pessoaId,
+          placa: placaPrincipal,
+          created_at: new Date().toISOString()
+        } as PlacaPessoa);
+      }
+      
+      setPlacasPessoa(placasExibir);
+      
+      // Selecionar a placa principal da pessoa por padrão, se existir
+      if (placaPrincipal) {
+        setPlacaSelecionada(placaPrincipal);
+      } else if (placasExibir.length > 0) {
+        // Caso contrário, selecionar a primeira placa da lista
+        setPlacaSelecionada(placasExibir[0].placa);
+      } else {
+        setPlacaSelecionada('');
+      }
+    } catch (error) {
+      console.error('Erro ao carregar placas:', error);
+    } finally {
+      setIsLoadingPlacas(false);
+    }
+  };
+
+  // Função para adicionar nova placa
+  const handleAdicionarNovaPlaca = async () => {
+    if (!novaPlaca.trim() || !selectedPessoaId) return;
+    
+    setIsAddingPlaca(true);
+    try {
+      const placaAdicionada = await adicionarPlacaPessoa(selectedPessoaId, novaPlaca);
+      
+      if (placaAdicionada) {
+        // Recarregar placas
+        const placas = await getPlacasPorPessoa(selectedPessoaId);
+        setPlacasPessoa(placas);
+        
+        // Selecionar a nova placa
+        setPlacaSelecionada(placaAdicionada.placa);
+        
+        // Limpar e fechar input
+        setNovaPlaca('');
+        setShowNovaPlaca(false);
+        
+        toast.success('Placa adicionada com sucesso!');
+      }
+    } catch (error) {
+      console.error('Erro ao adicionar placa:', error);
+      toast.error('Erro ao adicionar placa');
+    } finally {
+      setIsAddingPlaca(false);
+    }
+  };
   
   // Estado do formulário de edição
   const [editData, setEditData] = useState({
@@ -55,7 +191,7 @@ export function RegistrarEntradaModal({
     placa: '',
   });
 
-  // Filtragem
+  // Filtragem com paginação - otimizada para performance
   const filteredPessoas = useMemo(() => {
     if (!searchTerm.trim()) return pessoas;
     return pessoas.filter(p => 
@@ -64,6 +200,29 @@ export function RegistrarEntradaModal({
       smartSearch(p.placa || '', searchTerm)
     );
   }, [pessoas, searchTerm]);
+
+  // Lista limitada para renderização (paginação infinita)
+  const visiblePessoas = useMemo(() => {
+    return filteredPessoas.slice(0, visibleCount);
+  }, [filteredPessoas, visibleCount]);
+
+  // Reset da paginação quando a busca mudar
+  useEffect(() => {
+    setVisibleCount(20);
+  }, [searchTerm]);
+
+  // Função para carregar mais pessoas ao scroll
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLDivElement;
+    const isAtBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 100;
+    
+    if (isAtBottom && visibleCount < filteredPessoas.length) {
+      setVisibleCount(prev => Math.min(prev + LOAD_MORE_COUNT, filteredPessoas.length));
+    }
+  };
+
+  // Verificar se há mais pessoas para carregar
+  const hasMore = visibleCount < filteredPessoas.length;
 
   const selectedPessoa = useMemo(() => {
     return pessoas.find(p => p.id === selectedPessoaId);
@@ -85,12 +244,46 @@ export function RegistrarEntradaModal({
     });
   };
 
+  // Função para verificar no banco se pessoa está dentro
+  const verificarPessoaNoBanco = async (pessoaId: string) => {
+    if (!empresaAtual) return;
+    
+    setIsVerificandoBanco(true);
+    try {
+      const resultado = await verificarPessoaEstaDentro(pessoaId, empresaAtual.id);
+      if (resultado && resultado.estaDentro) {
+        setMovimentacaoAtivaBanco({
+          movimentacaoId: resultado.movimentacaoId!,
+          entradaEm: resultado.entradaEm!,
+          observacao: resultado.observacao,
+          placa: resultado.placa,
+          pernoite: resultado.pernoite,
+          diasPernoite: resultado.diasPernoite,
+        });
+      } else {
+        setMovimentacaoAtivaBanco(null);
+      }
+    } catch (error) {
+      console.error('Erro ao verificar pessoa no banco:', error);
+      // Em caso de erro, usa os dados locais
+      setMovimentacaoAtivaBanco(null);
+    } finally {
+      setIsVerificandoBanco(false);
+    }
+  };
+
   const handleSelectPessoa = (pessoaId: string) => {
     setSelectedPessoaId(pessoaId);
     const pessoa = pessoas.find(p => p.id === pessoaId);
     if (pessoa) {
       carregarDadosEdicao(pessoa);
       setIsEditing(false);
+      // Resetar pernoite ao selecionar nova pessoa
+      setPernoite(false);
+      setDiasPernoite(1);
+      // Carregar placas da pessoa passando a placa principal como parâmetro
+      carregarPlacasPessoa(pessoaId, pessoa.placa);
+      // A verificação de pessoa dentro é feita automaticamente pelo contexto (podeEntrar)
       // Focus on observação field after a small delay to ensure the form is rendered
       setTimeout(() => {
         const observacaoElement = document.getElementById('observacao-input');
@@ -122,21 +315,17 @@ export function RegistrarEntradaModal({
 
   const handleSaveEdit = async () => {
     if (selectedPessoaId) {
-      // Salvar a nova placa informada pelo usuário
-      const novaPlaca = editData.placa.trim() || null;
-      
-      // Atualizar dados da pessoa (se necessário)
       await atualizarPessoa(selectedPessoaId, {
         nome: editData.nome,
         documento: editData.documento,
         tipo: editData.tipo === '' ? undefined : editData.tipo,
         contato: editData.contato,
-        placa: novaPlaca,
+        placa: editData.placa,
       });
       setIsEditing(false);
       
-      // After saving edits, automatically register the entry with the new plate
-      const result = await registrarEntrada(selectedPessoaId, observacao, novaPlaca);
+      // After saving edits, automatically register the entry (with pernoite data and selected plate)
+      const result = await registrarEntrada(selectedPessoaId, observacao, placaSelecionada, pernoite, pernoite ? diasPernoite : undefined);
       if (result.success) {
         if (pessoaPreSelecionada && onPessoaPreSelecionadaUsada) {
           onPessoaPreSelecionadaUsada();
@@ -150,7 +339,7 @@ export function RegistrarEntradaModal({
     e.preventDefault();
     if (!selectedPessoaId || !validacao?.pode) return;
 
-    const result = await registrarEntrada(selectedPessoaId, observacao);
+    const result = await registrarEntrada(selectedPessoaId, observacao, placaSelecionada, pernoite, pernoite ? diasPernoite : undefined);
     if (result.success) {
       if (pessoaPreSelecionada && onPessoaPreSelecionadaUsada) {
         onPessoaPreSelecionadaUsada();
@@ -165,6 +354,7 @@ export function RegistrarEntradaModal({
     setObservacao('');
     setIsEditing(false);
     setEditData({ nome: '', documento: '', tipo: '', contato: '', placa: '' });
+    setMovimentacaoAtivaBanco(null);
     onOpenChange(false);
   };
 
@@ -208,72 +398,86 @@ export function RegistrarEntradaModal({
               </Button>
             </div>
 
-            {/* List */}
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+            {/* List - com paginação infinita */}
+            <div 
+              className="flex-1 overflow-y-auto p-2 space-y-1"
+              onScroll={handleScroll}
+            >
               {filteredPessoas.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center p-6 text-slate-500">
                   <UserPlus className="h-10 w-10 mb-3 opacity-20" />
                   <p className="font-medium mb-4">Ninguém encontrado</p>
                 </div>
               ) : (
-                filteredPessoas.map((pessoa) => {
-                  const check = podeEntrar(pessoa.id);
-                  const isSelected = selectedPessoaId === pessoa.id;
+                <>
+                  {visiblePessoas.map((pessoa) => {
+                    const check = podeEntrar(pessoa.id);
+                    const isSelected = selectedPessoaId === pessoa.id;
 
-                  return (
-                    <div
-                      key={pessoa.id}
-onClick={() => handleSelectPessoa(pessoa.id)}
-                      className={cn(
-                        "group w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all duration-200 border border-transparent",
-                        isSelected
-                          ? "bg-primary/5 border-primary/20 shadow-sm"
-                          : "hover:bg-slate-50 hover:border-slate-200 cursor-pointer"
-                      )}
-                    >
-                      {/* Avatar/Initials */}
-                      <UserTypeAvatar pessoa={pessoa} />
+                    return (
+                      <div
+                        key={pessoa.id}
+                        onClick={() => handleSelectPessoa(pessoa.id)}
+                        className={cn(
+                          "group w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all duration-200 border border-transparent",
+                          isSelected
+                            ? "bg-primary/5 border-primary/20 shadow-sm"
+                            : "hover:bg-slate-50 hover:border-slate-200 cursor-pointer"
+                        )}
+                      >
+                        {/* Avatar/Initials */}
+                        <UserTypeAvatar pessoa={pessoa} />
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <p className={cn("font-medium text-sm truncate", 
-                        isSelected && !validacao?.pode ? "text-red-700" : 
-                        isSelected ? "text-primary" : "text-black")}>
-                        {pessoa.nome}
-                      </p>
-                          {/* Badges de Status */}
-                          <div className="flex items-center gap-2">
-                            {!check.pode && (
-                              <span className="flex items-center gap-1 text-[11px] uppercase font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100">
-                                Na Marina
-                              </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <p className={cn("font-medium text-sm truncate", 
+                              isSelected && !validacao?.pode ? "text-red-700" : 
+                              isSelected ? "text-primary" : "text-black")}>
+                              {pessoa.nome}
+                            </p>
+                            {/* Badges de Status */}
+                            <div className="flex items-center gap-2">
+                              {!check.pode && (
+                                <span className="flex items-center gap-1 text-[11px] uppercase font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100">
+                                  Na Marina
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 mt-1 text-xs text-black">
+                            <span className="truncate">{pessoa.documento || 'Sem doc'}</span>
+                            {pessoa.placa && (
+                              <>
+                                <span className="w-1 h-1 rounded-full bg-slate-300" />
+                                <span className="font-mono bg-slate-100 px-1 rounded">{formatters.placa(pessoa.placa)}</span>
+                              </>
                             )}
                           </div>
                         </div>
-                        
-                        <div className="flex items-center gap-2 mt-1 text-xs text-black">
-                          <span className="truncate">{pessoa.documento || 'Sem doc'}</span>
-                          {pessoa.placa && (
-                            <>
-                              <span className="w-1 h-1 rounded-full bg-slate-300" />
-                              <span className="font-mono bg-slate-100 px-1 rounded">{formatters.placa(pessoa.placa)}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
 
-                      {/* Ação Rápida de Edição */}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-10 w-10 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                        onClick={(e) => handleEditDirectlyFromList(e, pessoa.id)}
-                      >
-                        <Edit2 className="h-4 w-4 text-slate-500" />
-                      </Button>
+                        {/* Ação Rápida de Edição */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-10 w-10 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                          onClick={(e) => handleEditDirectlyFromList(e, pessoa.id)}
+                        >
+                          <Edit2 className="h-4 w-4 text-slate-500" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                  
+                  {/* Indicador de mais resultados */}
+                  {hasMore && (
+                    <div className="flex items-center justify-center py-4 text-sm text-slate-400">
+                      <div className="h-1 w-8 bg-slate-200 rounded-full mr-2" />
+                      Carregando mais...
+                      <div className="h-1 w-8 bg-slate-200 rounded-full ml-2" />
                     </div>
-                  );
-                })
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -291,7 +495,7 @@ onClick={() => handleSelectPessoa(pessoa.id)}
                     <div className="space-y-2">
 
                       <div className="grid gap-3">
-                        <Label className="text-[11px] text-black">Nome</Label>
+
                         <Input
                           value={editData.nome}
                           disabled={!isEditing}
@@ -393,68 +597,138 @@ onClick={() => handleSelectPessoa(pessoa.id)}
                           </div>
                           <div className="space-y-1">
                             <div className="flex items-center gap-2 mb-1">
-                              <Car className="h-3 w-3 text-black" />
-                              <Label className="text-xs text-black">Placa</Label>
+                              <Moon className="h-3 w-3 text-black" />
+                              <Label className="text-xs text-black">Pernoite</Label>
                             </div>
-                            <Input
-                              value={editData.placa}
-                              disabled={!isEditing}
-                              onChange={(e) => {
-                                if (isEditing) {
-                                  let value = e.target.value.toUpperCase();
-                                  
-                                  // Se o valor atual tem hífen e o usuário está apagando, permitir a remoção
-                                  if (value.includes('-')) {
-                                    const beforeValue = editData.placa;
-                                    const currentValue = value;
-                                    
-                                    // Verificar se o usuário está apagando (comprimento diminuiu)
-                                    if (currentValue.length < beforeValue.length) {
-                                      // Se está apagando o hífen, remover o hífen e continuar
-                                      if (currentValue.includes('-')) {
-                                        value = value.replace('-', '');
-                                      } else {
-                                        // Se o hífen foi removido, manter sem hífen
-                                        value = value.replace(/[^a-zA-Z0-9]/g, '');
-                                      }
-                                    } else {
-                                      // Se está digitando, remover caracteres inválidos e inserir hífen
-                                      value = value.replace(/[^a-zA-Z0-9-]/g, '');
-                                      if (value.length >= 4 && !value.includes('-')) {
-                                        value = value.substring(0, 3) + '-' + value.substring(3);
-                                      }
-                                    }
-                                  } else {
-                                    // Sem hífen: permitir apenas letras e números
-                                    value = value.replace(/[^a-zA-Z0-9]/g, '');
-                                    // Inserir hífen após 3 caracteres
-                                    if (value.length >= 3) {
-                                      value = value.substring(0, 3) + '-' + value.substring(3);
-                                    }
-                                  }
-                                  
-                                  setEditData({ ...editData, placa: value });
-                                }
-                              }}
-                              onKeyDown={(e) => {
-                                if (isEditing) {
-                                  // Permitir teclas de controle
-                                  const controlKeys = ['Backspace', 'Delete', 'Tab', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'];
-                                  
-                                  if (!controlKeys.includes(e.key) && !/^[a-zA-Z0-9]$/.test(e.key)) {
-                                    e.preventDefault();
-                                  }
-                                }
-                              }}
-                              className={cn(
-                                "bg-white font-mono",
-                                !isEditing && "bg-slate-50 border-slate-300 text-black"
+                            <div className="flex items-center gap-2 h-10">
+                              <Switch
+                                checked={pernoite}
+                                onCheckedChange={setPernoite}
+                                className="data-[state=checked]:bg-indigo-600"
+                              />
+                              {pernoite ? (
+                                <select
+                                  value={diasPernoite}
+                                  onChange={(e) => setDiasPernoite(Number(e.target.value))}
+                                  className="h-8 rounded border border-slate-300 bg-white px-1 text-sm"
+                                >
+                                  <option value={1}>1 dia</option>
+                                  <option value={2}>2 dias</option>
+                                  <option value={3}>3 dias</option>
+                                  <option value={4}>4 dias</option>
+                                  <option value={5}>5 dias</option>
+                                  <option value={7}>7 dias</option>
+                                  <option value={15}>15 dias</option>
+                                  <option value={30}>30 dias</option>
+                                </select>
+                              ) : (
+                                <span className="text-sm text-muted-foreground">Não</span>
                               )}
-                              placeholder="---"
-                            />
+
+
+                              
+                            </div>
+
+                            
                           </div>
+
+                          
                         </div>
+                                              {/* Label e Botão Nova Placa na mesma linha */}
+                      <div className="flex items-center gap-2 mt-4">
+                        <Label className="flex items-center gap-2 text-sm font-medium text-black">
+                          <Car className="h-4 w-4" />
+                          Placa do Veículo
+                        </Label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowNovaPlaca(true)}
+                          className="h-8 px-3 text-xs font-medium gap-1.5 border-dashed border-slate-300 hover:border-primary hover:bg-primary/5 text-slate-600 hover:text-primary transition-all"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          Nova Placa
+                        </Button>
+                      </div>
+                      
+                      {/* Input de Nova Placa (quando ativado) */}
+                      {showNovaPlaca && (
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="text"
+                            value={novaPlaca}
+                            onChange={(e) => {
+                              let value = e.target.value.toUpperCase();
+                              value = value.replace(/[^a-zA-Z0-9]/g, '');
+                              if (value.length >= 3 && !value.includes('-')) {
+                                value = value.substring(0, 3) + '-' + value.substring(3, 7);
+                              }
+                              setNovaPlaca(value.substring(0, 8));
+                            }}
+                            placeholder="ABC-1234"
+                            maxLength={8}
+                            className="h-9 text-sm font-mono uppercase"
+                            disabled={isAddingPlaca}
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={handleAdicionarNovaPlaca}
+                            disabled={novaPlaca.length < 7 || isAddingPlaca}
+                            className="h-9"
+                          >
+                            {isAddingPlaca ? (
+                              <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              'Salvar'
+                            )}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setShowNovaPlaca(false);
+                              setNovaPlaca('');
+                            }}
+                            className="h-9 px-2"
+                          >
+                            ✕
+                          </Button>
+                        </div>
+                      )}
+                      
+                      {isLoadingPlacas ? (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                          <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                          Carregando placas...
+                        </div>
+                      ) : placasPessoa.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {placasPessoa.map((placa) => (
+                            <button
+                              key={placa.id}
+                              type="button"
+                              onClick={() => setPlacaSelecionada(placa.placa)}
+                              className={cn(
+                                "px-3 py-2 rounded-lg text-sm font-mono font-medium transition-all duration-200 border-2",
+                                placaSelecionada === placa.placa
+                                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                                  : "bg-background border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-foreground"
+                              )}
+                            >
+                              {placa.placa}
+                            </button>
+                          ))}
+                        </div>
+                      ) : !showNovaPlaca ? (
+                        <div className="text-sm text-muted-foreground py-2">
+                          Nenhuma placa cadastrada
+                        </div>
+                      ) : null}
                     </div>
+
 
                     <div className="space-y-2 pt-4 border-t border-slate-300">
                       <Label className="flex items-center gap-2 text-sm font-medium text-black">
@@ -480,12 +754,33 @@ onClick={() => handleSelectPessoa(pessoa.id)}
 
                   {/* Alerta se não pode entrar */}
                   {validacao && !validacao.pode && (
-                    <div className="rounded-lg bg-red-50 p-4 border border-red-100 flex gap-3 animate-in fade-in slide-in-from-top-2">
-                      <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
-                      <div>
-                        <h4 className="font-semibold text-red-900 text-sm">Entrada Bloqueada</h4>
-                        <p className="text-sm text-red-700 mt-1">{validacao.motivo}</p>
+                    <div className="space-y-3">
+                      <div className="rounded-lg bg-red-50 p-4 border border-red-100 flex gap-3 animate-in fade-in slide-in-from-top-2">
+                        <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+                        <div>
+                          <h4 className="font-semibold text-red-900 text-sm">Entrada Bloqueada</h4>
+                          <p className="text-sm text-red-700 mt-1">{validacao.motivo}</p>
+                        </div>
                       </div>
+                      
+                      {/* Botão de saída por esquecimento - usa verificação do banco se disponível */}
+                      {(movimentacaoAtivaExibir || movimentacaoAtiva) && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleSaidaPorEsquecimento}
+                          disabled={isRegistrandoSaida}
+                          className="w-full h-10 border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 hover:border-amber-400"
+                        >
+                          {isRegistrandoSaida ? (
+                            <div className="h-4 w-4 border-2 border-amber-600 border-t-transparent rounded-full animate-spin mr-2" />
+                          ) : (
+                            <LogOut className="h-4 w-4 mr-2" />
+                          )}
+                          Registrar Saída por Esquecimento
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>

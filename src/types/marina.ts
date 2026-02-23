@@ -39,7 +39,9 @@ export interface Movimentacao {
   saida_em?: string | null;    // ISO datetime
   status: MovimentacaoStatus;
   observacao?: string | null;
-  placa?: string | null;       // Placa do veículo no momento da entrada
+  placa?: string | null;  // Placa do veículo no momento da entrada/saída
+  pernoite?: boolean;    // Indica se é pernoite/multi-dias
+  dias_pernoite?: number; // Quantos dias vai ficar (padrão: 1)
   created_at: string;
 }
 
@@ -53,6 +55,9 @@ export interface PessoaDentro {
   pessoa: Pessoa;
   entradaEm: string;
   observacao?: string | null;
+  placa?: string | null;
+  pernoite?: boolean;
+  dias_pernoite?: number;
 }
 
 // Form types

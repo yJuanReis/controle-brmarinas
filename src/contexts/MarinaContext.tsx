@@ -32,9 +32,10 @@ interface MarinaContextType {
   excluirPessoa: (pessoaId: string) => Promise<void>;
 
   // Movimentação actions
-  registrarEntrada: (pessoaId: string, observacao?: string, placa?: string) => Promise<{ success: boolean; error?: string }>;
+  registrarEntrada: (pessoaId: string, observacao?: string, placa?: string, pernoite?: boolean, dias_pernoite?: number) => Promise<{ success: boolean; error?: string }>;
   registrarSaida: (movimentacaoId: string, saidaEm?: string, observacao?: string) => Promise<{ success: boolean; error?: string }>;
-  atualizarMovimentacao: (movimentacaoId: string, data: { entrada_em: string; saida_em?: string; observacao?: string }) => Promise<void>;
+  alternarPernoite: (movimentacaoId: string, pernoite: boolean, dias_pernoite?: number) => Promise<void>;
+  atualizarMovimentacao: (movimentacaoId: string, data: { entrada_em: string; saida_em?: string; observacao?: string; placa?: string }) => Promise<void>;
   excluirMovimentacao: (movimentacaoId: string) => Promise<void>;
 
   // User management actions
@@ -328,7 +329,7 @@ export function MarinaProvider({ children }: { children: ReactNode }) {
   }, [movimentacoes, empresaAtual]);
 
   // Movimentação actions
-  const registrarEntrada = useCallback(async (pessoaId: string, observacao?: string, placa?: string): Promise<{ success: boolean; error?: string }> => {
+  const registrarEntrada = useCallback(async (pessoaId: string, observacao?: string, placa?: string, pernoite?: boolean, dias_pernoite?: number): Promise<{ success: boolean; error?: string }> => {
     if (!empresaAtual) {
       return { success: false, error: 'Nenhuma empresa selecionada' };
     }
@@ -349,21 +350,25 @@ export function MarinaProvider({ children }: { children: ReactNode }) {
       // Gerar UUID para o id da movimentação
       const movimentacaoId = crypto.randomUUID();
 
-      // Obter a placa da pessoa se não for fornecida
-      const pessoa = pessoas.find(p => p.id === pessoaId);
-      const placaVeiculo = placa || pessoa?.placa || null;
+      const insertData: any = {
+        id: movimentacaoId,
+        empresa_id: empresaAtual.id,
+        pessoa_id: pessoaId,
+        entrada_em: new Date().toISOString(),
+        status: 'DENTRO',
+        observacao: observacao?.trim() || null,
+        placa: placa || null,
+      };
+
+      // Adicionar campos de pernoite se especificado
+      if (pernoite) {
+        insertData.pernoite = true;
+        insertData.dias_pernoite = dias_pernoite || 1;
+      }
 
       const { data: novaMovimentacao, error } = await supabase
         .from('movimentacoes')
-        .insert({
-          id: movimentacaoId,
-          empresa_id: empresaAtual.id,
-          pessoa_id: pessoaId,
-          entrada_em: new Date().toISOString(),
-          status: 'DENTRO',
-          observacao: observacao?.trim() || null,
-          placa: placaVeiculo,
-        })
+        .insert(insertData)
         .select()
         .single();
 
@@ -371,7 +376,9 @@ export function MarinaProvider({ children }: { children: ReactNode }) {
 
       setMovimentacoes(prev => [...prev, novaMovimentacao]);
 
-      toast.success(`Entrada registrada: ${pessoa?.nome || 'Visitante'}`);
+      const pessoa = pessoas.find(p => p.id === pessoaId);
+      const pernoiteMsg = pernoite ? ` (${dias_pernoite || 1} dia${(dias_pernoite || 1) > 1 ? 's' : ''} de pernoite)` : '';
+      toast.success(`Entrada registrada: ${pessoa?.nome || 'Visitante'}${pernoiteMsg}`);
       
 
       return { success: true };
@@ -457,10 +464,58 @@ export function MarinaProvider({ children }: { children: ReactNode }) {
     }
   }, [movimentacoes, pessoas]);
 
+  // Alternar status de pernoite
+  const alternarPernoite = useCallback(async (movimentacaoId: string, pernoite: boolean, dias_pernoite?: number): Promise<void> => {
+    try {
+      const movimentacao = movimentacoes.find(m => m.id === movimentacaoId);
+
+      if (!movimentacao) {
+        throw new Error('Movimentação não encontrada');
+      }
+
+      if (movimentacao.status !== 'DENTRO') {
+        throw new Error('Não é possível alterar pernoite de uma movimentação finalizada');
+      }
+
+      const updateData: any = {
+        pernoite: pernoite,
+      };
+
+      if (pernoite && dias_pernoite) {
+        updateData.dias_pernoite = dias_pernoite;
+      } else if (!pernoite) {
+        updateData.dias_pernoite = null;
+      }
+
+      const { data: movimentacaoAtualizada, error } = await supabase
+        .from('movimentacoes')
+        .update(updateData)
+        .eq('id', movimentacaoId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setMovimentacoes(prev => prev.map(m =>
+        m.id === movimentacaoId ? movimentacaoAtualizada : m
+      ));
+
+      const pessoa = pessoas.find(p => p.id === movimentacao.pessoa_id);
+      if (pernoite) {
+        toast.success(`${pessoa?.nome || 'Pessoa'} marcado para pernoite (${dias_pernoite || 1} dia${(dias_pernoite || 1) > 1 ? 's' : ''})`);
+      } else {
+        toast.success(`${pessoa?.nome || 'Pessoa'} desmarcado de pernoite`);
+      }
+    } catch (err) {
+      toast.error('Erro ao alterar status de pernoite');
+      throw err;
+    }
+  }, [movimentacoes, pessoas]);
+
   // Atualizar movimentação (entrada, saída, observação)
   const atualizarMovimentacao = useCallback(async (
     movimentacaoId: string,
-    data: { entrada_em: string; saida_em?: string; observacao?: string }
+    data: { entrada_em: string; saida_em?: string; observacao?: string; placa?: string }
   ): Promise<void> => {
     try {
       const movimentacao = movimentacoes.find(m => m.id === movimentacaoId);
@@ -472,6 +527,11 @@ export function MarinaProvider({ children }: { children: ReactNode }) {
       const updateData: any = {
         entrada_em: data.entrada_em,
       };
+
+      // Atualizar placa da movimentação (NUNCA sobrescreve cadastro da pessoa)
+      if (data.placa !== undefined) {
+        updateData.placa = data.placa;
+      }
 
       // Se houver saída definida, atualizar status e saida_em
       if (data.saida_em) {
@@ -560,9 +620,12 @@ export function MarinaProvider({ children }: { children: ReactNode }) {
           pessoa,
           entradaEm: m.entrada_em,
           observacao: m.observacao,
+          placa: m.placa,
+          pernoite: m.pernoite || false,
+          dias_pernoite: m.dias_pernoite,
         };
       })
-      .filter((item): item is { movimentacaoId: string; pessoa: Pessoa; entradaEm: string; observacao: string } => item !== null && item.pessoa !== undefined)
+      .filter((item): item is { movimentacaoId: string; pessoa: Pessoa; entradaEm: string; observacao: string; placa: string; pernoite: boolean; dias_pernoite?: number } => item !== null && item.pessoa !== undefined)
       .sort((a, b) => new Date(b.entradaEm).getTime() - new Date(a.entradaEm).getTime());
   }, [movimentacoes, pessoas, empresaAtual]);
 
@@ -601,11 +664,7 @@ export function MarinaProvider({ children }: { children: ReactNode }) {
       }
       if (filtros.placa) {
         const placa = filtros.placa.toLowerCase();
-        // Busca tanto na placa da pessoa quanto na placa da movimentação
-        resultado = resultado.filter(m => 
-          m.pessoa.placa?.toLowerCase().includes(placa) || 
-          m.placa?.toLowerCase().includes(placa)
-        );
+        resultado = resultado.filter(m => m.pessoa.placa?.toLowerCase().includes(placa));
       }
     }
 
@@ -897,6 +956,7 @@ return [];
     excluirPessoa,
     registrarEntrada,
     registrarSaida,
+    alternarPernoite,
     atualizarMovimentacao,
     excluirMovimentacao,
     adicionarUsuario,
@@ -930,6 +990,7 @@ return [];
     excluirPessoa,
     registrarEntrada,
     registrarSaida,
+    alternarPernoite,
     atualizarMovimentacao,
     excluirMovimentacao,
     adicionarUsuario,

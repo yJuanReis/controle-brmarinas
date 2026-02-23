@@ -65,10 +65,12 @@ import {
   Lock,
   ArrowRightLeft,
   Eye,
+  RefreshCw,
 } from 'lucide-react';
 import { AdicionarUsuarioModal } from '@/components/modals/AdicionarUsuarioModal';
 import { AlterarSenhaModal } from '@/components/modals/AlterarSenhaModal';
 import { RelatoriosModal } from '@/components/modals/RelatoriosModal';
+import { GerenciarVersaoModal } from '@/components/modals/GerenciarVersaoModal';
 import { Navigate } from 'react-router-dom';
 import { AppUser } from '@/types/marina';
 
@@ -85,6 +87,7 @@ export function AdminPanel() {
 
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showRelatoriosModal, setShowRelatoriosModal] = useState(false);
+  const [showGerenciarVersaoModal, setShowGerenciarVersaoModal] = useState(false);
 
   // Pagination states
   const [empresasCurrentPage, setEmpresasCurrentPage] = useState(1);
@@ -815,6 +818,30 @@ export function AdminPanel() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Versão do App - Apenas para Owner */}
+              {user?.role === 'owner' && (
+                <Card className="border-amber-200 bg-amber-50">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-amber-700">
+                      <RefreshCw className="h-5 w-5" />
+                      Versão do App
+                    </CardTitle>
+                    <CardDescription className="text-amber-600">
+                      Gerencie a versão para notificar usuários sobre atualizações
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button
+                      onClick={() => setShowGerenciarVersaoModal(true)}
+                      className="w-full bg-amber-500 hover:bg-amber-600 gap-2"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Gerenciar Versão
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
           </TabsContent>
@@ -936,6 +963,12 @@ export function AdminPanel() {
         }}
         usuarioId={selectedUserForPasswordChange?.id || ''}
         nomeUsuario={selectedUserForPasswordChange?.nome || ''}
+      />
+
+      {/* Gerenciar Versão Modal */}
+      <GerenciarVersaoModal
+        open={showGerenciarVersaoModal}
+        onOpenChange={setShowGerenciarVersaoModal}
       />
     </div>
   </TooltipProvider>

@@ -9,7 +9,8 @@ import { useMarina } from '@/contexts/MarinaContext';
 import { 
   LogIn, Search, FileText, Phone, Car, AlertCircle, 
   UserPlus, Edit2, X, Users, Gift, Ship, Briefcase, 
-  CheckCircle, XCircle, Save, LogOut, Plus, Moon
+  CheckCircle, XCircle, Save, LogOut, Plus, Moon, Badge,
+  User
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UserTypeAvatar } from '@/lib/userTypeIcons';
@@ -505,23 +506,31 @@ export function RegistrarEntradaModal({
                   
                   {/* Grid de Dados */}
                   <div className="space-y-4">
-                    <div className="space-y-2">
+                      <div className="space-y-2">
 
                       <div className="grid gap-3">
-
-                        <Input
-                          value={editData.nome}
-                          disabled={!isEditing}
-                          onChange={(e) => setEditData({ ...editData, nome: e.target.value })}
-                          className={cn(
-                            "bg-white",
-                            !isEditing && "bg-slate-50 border-slate-200 text-slate-500 font-normal"
-                          )}
-                          placeholder="Nome Completo"
-                        />
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <User className="h-3 w-3 text-black" />
+                            <Label className="text-xs text-black">Nome</Label>
+                          </div>
+                          <Input
+                            value={editData.nome}
+                            disabled={!isEditing}
+                            onChange={(e) => setEditData({ ...editData, nome: e.target.value })}
+                            className={cn(
+                              "bg-white",
+                              !isEditing && "bg-slate-50 border-slate-200 text-slate-500 font-normal"
+                            )}
+                            placeholder="Nome Completo"
+                          />
+                        </div>
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1">
-                            <Label className="text-[11px] text-black">Documento</Label>
+                            <div className="flex items-center gap-2 mb-1">
+                              <FileText className="h-3 w-3 text-black" />
+                              <Label className="text-[11px] text-black">Documento</Label>
+                            </div>
                             <Input
                               value={editData.documento}
                               disabled={!isEditing}
@@ -551,8 +560,11 @@ export function RegistrarEntradaModal({
                             />
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-[11px] text-black">Tipo</Label>
-{isEditing ? (
+                            <div className="flex items-center gap-2 mb-1">
+                              <Badge className="h-3 w-3 text-black" />
+                              <Label className="text-[11px] text-black">Tipo</Label>
+                            </div>
+                            {isEditing ? (
                               <select
                                 value={editData.tipo}
                                 onChange={(e) => {

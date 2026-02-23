@@ -14,6 +14,7 @@ import { AdminPanel } from "./pages/AdminPanel";
 import NotFound from "./pages/NotFound";
 import { UnauthorizedPage } from "./pages/UnauthorizedPage";
 import { LoadingPage } from "./components/LoadingPage";
+import { UpdateNotification } from "./components/UpdateNotification";
 
 const queryClient = new QueryClient();
 
@@ -125,6 +126,7 @@ const App = () => {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <MarinaProvider>
+          <UpdateNotification />
           <Toaster />
           <Sonner />
           <BrowserRouter

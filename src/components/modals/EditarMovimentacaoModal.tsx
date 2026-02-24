@@ -161,15 +161,14 @@ export function EditarMovimentacaoModal({ open, onOpenChange, movimentacao }: Ed
         const placas = await getPlacasPorPessoa(pessoaId);
         setPlacasPessoa(placas);
         
-        // NÃO selecionar automaticamente a nova placa
-        // A placa foi adicionada à pessoa, mas não será salva na movimentação
-        // a menos que o usuário clique nela para selecionar
+        // Selecionar automaticamente a nova placa adicionada
+        setPlacaSelecionada(placaAdicionada.placa);
         
         // Limpar e fechar input
         setNovaPlaca('');
         setShowNovaPlaca(false);
         
-        toast.success('Placa adicionada à pessoa! Clique em uma placa para selecionar.');
+        toast.success('Placa adicionada à pessoa!');
       }
     } catch (error) {
       console.error('Erro ao adicionar placa:', error);
@@ -306,8 +305,9 @@ export function EditarMovimentacaoModal({ open, onOpenChange, movimentacao }: Ed
                 <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                 Carregando placas...
               </div>
-            ) : placasPessoa.length > 0 ? (
+            ) : (
               <div className="flex flex-wrap gap-2">
+                {/* Lista de placas existentes */}
                 {placasPessoa.map((placa) => (
                   <button
                     key={placa.id}
@@ -324,28 +324,19 @@ export function EditarMovimentacaoModal({ open, onOpenChange, movimentacao }: Ed
                   </button>
                 ))}
                 
-                {/* Botão Nova Placa */}
-                {!showNovaPlaca ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowNovaPlaca(true)}
-                    className="px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 border-2 border-dashed border-slate-300 hover:border-slate-400 hover:bg-slate-50 text-slate-600 flex items-center gap-1"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Nova Placa
-                  </button>
-                ) : (
+                {/* Input de Nova Placa (quando ativado) */}
+                {showNovaPlaca ? (
                   <div className="flex items-center gap-1">
                     <Input
                       type="text"
                       value={novaPlaca}
                       onChange={(e) => {
-                        // Usar normalizarPlaca para formatar com espaços: ABC-1234
+                        // Usar normalizarPlaca para formatar: ABC-1234
                         const normalized = normalizarPlaca(e.target.value);
                         setNovaPlaca(normalized);
                       }}
                       placeholder="ABC-1234"
-                      maxLength={9}
+                      maxLength={8}
                       className="h-10 w-32 text-sm font-mono uppercase"
                       disabled={isAddingPlaca}
                     />
@@ -353,7 +344,7 @@ export function EditarMovimentacaoModal({ open, onOpenChange, movimentacao }: Ed
                       type="button"
                       size="sm"
                       onClick={handleAdicionarNovaPlaca}
-                      disabled={novaPlaca.length < 7 || isAddingPlaca}
+                      disabled={novaPlaca.length < 4 || isAddingPlaca}
                       className="h-10"
                     >
                       {isAddingPlaca ? (
@@ -375,18 +366,17 @@ export function EditarMovimentacaoModal({ open, onOpenChange, movimentacao }: Ed
                       ✕
                     </Button>
                   </div>
+                ) : (
+                  /* Botão Nova Placa (sempre visível) */
+                  <button
+                    type="button"
+                    onClick={() => setShowNovaPlaca(true)}
+                    className="px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 border-2 border-dashed border-slate-300 hover:border-slate-400 hover:bg-slate-50 text-slate-600 flex items-center gap-1"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Nova Placa
+                  </button>
                 )}
-              </div>
-            ) : (
-              <div className="text-sm text-muted-foreground py-2">
-                Nenhuma placa cadastrada
-                <button
-                  type="button"
-                  onClick={() => setShowNovaPlaca(true)}
-                  className="ml-2 text-primary hover:underline"
-                >
-                  Adicionar placa
-                </button>
               </div>
             )}
             

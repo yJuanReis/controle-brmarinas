@@ -48,13 +48,9 @@ export function useAppVersion(): VersionInfo {
       if (shouldShowUpdate) {
         toast({
           title: 'Atualização disponível!',
-          description: `Nova versão ${latestVersion} disponível. Clique para atualizar.`,
+          description: `Nova versão ${latestVersion} disponível.`,
           variant: 'default',
-          duration: 0, // Não自动关闭
-          action: {
-            label: 'Atualizar',
-            onClick: () => window.location.reload(),
-          },
+          duration: 0, // Não fechar automaticamente
         });
       }
     } catch (error) {

@@ -189,7 +189,19 @@ export function RegistrarSaidaEmLoteModal({ open, onOpenChange, pessoasDentro }:
               return (
                 <div
                   key={item.movimentacaoId}
-                  className={`rounded-lg border p-3 transition-smooth ${
+                  onClick={() => {
+                    // Toggle proteção ao clicar no card
+                    setPessoasProtegidas(prev => {
+                      const next = new Set(prev);
+                      if (next.has(item.movimentacaoId)) {
+                        next.delete(item.movimentacaoId);
+                      } else {
+                        next.add(item.movimentacaoId);
+                      }
+                      return next;
+                    });
+                  }}
+                  className={`rounded-lg border p-3 transition-smooth cursor-pointer ${
                     jaRegistrou
                       ? 'bg-success/10 border-success/50'
                       : isProtegida
@@ -212,6 +224,7 @@ export function RegistrarSaidaEmLoteModal({ open, onOpenChange, pessoasDentro }:
                           return next;
                         });
                       }}
+                      onClick={(e) => e.stopPropagation()}
                       className="shrink-0"
                     />
                     
@@ -254,15 +267,18 @@ export function RegistrarSaidaEmLoteModal({ open, onOpenChange, pessoasDentro }:
                     {/* Botões de ação */}
                     <div className="flex gap-2 flex-shrink-0">
                       <Button
-                        onClick={() => setMostrando(prev => {
-                          const next = new Set(prev);
-                          if (next.has(item.movimentacaoId)) {
-                            next.delete(item.movimentacaoId);
-                          } else {
-                            next.add(item.movimentacaoId);
-                          }
-                          return next;
-                        })}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMostrando(prev => {
+                            const next = new Set(prev);
+                            if (next.has(item.movimentacaoId)) {
+                              next.delete(item.movimentacaoId);
+                            } else {
+                              next.add(item.movimentacaoId);
+                            }
+                            return next;
+                          });
+                        }}
                         variant="ghost"
                         size="sm"
                         className="gap-1 h-8 w-8 p-0"
@@ -271,7 +287,8 @@ export function RegistrarSaidaEmLoteModal({ open, onOpenChange, pessoasDentro }:
                         <MessageSquare className="h-4 w-4" />
                       </Button>
                       <Button
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           if (!jaRegistrou) {
                             handleAbrirConfirmacao(item);
                           }

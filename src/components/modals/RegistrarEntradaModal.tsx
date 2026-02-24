@@ -45,6 +45,9 @@ export function RegistrarEntradaModal({
 }: RegistrarEntradaModalProps) {
   const { pessoas, registrarEntrada, registrarSaida, podeEntrar, atualizarPessoa, movimentacoes, empresaAtual } = useMarina();
   
+  // Estado para controlar a etapa (mobile/tablet vs desktop)
+  const [currentStep, setCurrentStep] = useState<'search' | 'data'>('search');
+  
   // Estados
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPessoaId, setSelectedPessoaId] = useState<string | null>(null);
@@ -288,7 +291,10 @@ export function RegistrarEntradaModal({
       setDiasPernoite(1);
       // Carregar placas da pessoa passando a placa principal como parâmetro
       carregarPlacasPessoa(pessoaId, pessoa.placa);
-      // A verificação de pessoa dentro é feita automaticamente pelo contexto (podeEntrar)
+      
+      // No mobile/tablet, mudar para etapa de dados
+      setCurrentStep('data');
+      
       // Focus on observação field after a small delay to ensure the form is rendered
       setTimeout(() => {
         const observacaoElement = document.getElementById('observacao-input');
@@ -297,6 +303,15 @@ export function RegistrarEntradaModal({
         }
       }, 100);
     }
+  };
+  
+  // Voltar para etapa de busca (mobile/tablet)
+  const handleBackToSearch = () => {
+    setCurrentStep('search');
+    setSelectedPessoaId(null);
+    setObservacao('');
+    setPernoite(false);
+    setDiasPernoite(1);
   };
 
   const handleEditDirectlyFromList = (e: React.MouseEvent, pessoaId: string) => {
@@ -373,6 +388,16 @@ export function RegistrarEntradaModal({
   };
 
 
+  // Função para resetar o estado quando o modal abre
+  useEffect(() => {
+    if (open) {
+      setCurrentStep('search');
+    }
+  }, [open]);
+
+  // Helper para verificar se é mobile/tablet (abaixo de lg = 1024px)
+  const isMobileOrTablet = typeof window !== 'undefined' ? window.innerWidth < 1024 : false;
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-6xl h-[90vh] max-h-[900px] flex flex-col p-0 overflow-hidden bg-slate-50 gap-0" hideCloseButton>
@@ -383,8 +408,12 @@ export function RegistrarEntradaModal({
         </DialogHeader>
 
         <div className="flex-1 flex flex-col lg:flex-row min-h-0">
-          {/* LADO ESQUERDO: LISTA E BUSCA */}
-          <div className="flex-1 flex flex-col border-r border-slate-200 bg-white min-w-0">
+          {/* LADO ESQUERDO: LISTA E BUSCA - Oculto no mobile/tablet quando estiver na etapa de dados */}
+          <div className={cn(
+            "flex-1 flex flex-col border-r border-slate-200 bg-white min-w-0",
+            // No mobile/tablet: ocultar se estiver na etapa de dados
+            currentStep === 'data' && "hidden lg:flex"
+          )}>
             {/* Search Bar */}
             <div className="p-4 border-b border-slate-100 flex gap-2">
               <div className="relative flex-1">
@@ -469,16 +498,6 @@ export function RegistrarEntradaModal({
                             )}
                           </div>
                         </div>
-
-                        {/* Ação Rápida de Edição */}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-10 w-10 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                          onClick={(e) => handleEditDirectlyFromList(e, pessoa.id)}
-                        >
-                          <Edit2 className="h-4 w-4 text-slate-500" />
-                        </Button>
                       </div>
                     );
                   })}
@@ -498,11 +517,59 @@ export function RegistrarEntradaModal({
 
           {/* LADO DIREITO: DETALHES E AÇÃO */}
           <div className="lg:w-[500px] flex flex-col bg-slate-50/50">
+            {/* Header visível apenas no mobile/tablet quando está na etapa de dados */}
+            <div className={cn(
+              "lg:hidden flex items-center justify-between gap-3 p-4 border-b border-slate-200 bg-white",
+              currentStep === 'search' && "hidden"
+            )}>
+              <div className="flex items-center gap-3">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleBackToSearch}
+                  className="h-10 w-10"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </Button>
+                <div>
+                  <h3 className="font-semibold text-black">Dados da Entrada</h3>
+                  <p className="text-xs text-muted-foreground">Preencha os dados e confirme</p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditing(!isEditing)}
+                className="gap-1.5 h-9"
+              >
+                <Edit2 className="h-4 w-4" />
+                <span className="hidden sm:inline">{isEditing ? 'Cancelar' : 'Editar'}</span>
+              </Button>
+            </div>
+
+            {/* Desktop: botão editar fixo no topo */}
+            <div className="hidden lg:flex items-center justify-end p-4 pb-0">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditing(!isEditing)}
+                className="gap-1.5"
+              >
+                <Edit2 className="h-4 w-4" />
+                {isEditing ? 'Cancelar' : 'Editar Dados'}
+              </Button>
+            </div>
+
             {selectedPessoa ? (
               <form onSubmit={handleSubmitEntrada} className="flex-1 flex flex-col h-full">
                 
                 {/* 2. Área de Conteúdo (Scrollable) */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 md:space-y-6">
                   
                   {/* Grid de Dados */}
                   <div className="space-y-4">

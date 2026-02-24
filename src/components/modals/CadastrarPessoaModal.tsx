@@ -59,9 +59,8 @@ export function CadastrarPessoaModal({ open, onOpenChange, onCadastrarERegistrar
       processedValue = value.replace(/\D/g, '');
     } else if (field === 'placa') {
       processedValue = value.toUpperCase();
-    } else if (field === 'tipo') {
-      processedValue = value.toUpperCase();
     }
+    // Campo tipo não precisa de processamento especial
     
     setFormData(prev => ({ ...prev, [field]: processedValue }));
     if (errors[field]) {

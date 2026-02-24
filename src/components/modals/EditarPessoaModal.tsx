@@ -6,10 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useMarina } from '@/contexts/MarinaContext';
 import { Pessoa } from '@/types/marina';
-import { FileText, Phone, Car, Users, Gift, Ship, Briefcase } from 'lucide-react';
+import { FileText, Phone, Car, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { validateCPF, validateRG, validatePlaca, validateDocument, detectDocumentType } from '@/lib/validation';
+import { detectDocumentType } from '@/lib/validation';
 import { normalizarPlaca } from '@/lib/validation/formatters';
+import { supabase } from '@/lib/supabase';
 
 type TipoPessoa = 'cliente' | 'visita' | 'marinheiro' | 'proprietario' | 'colaborador' | 'prestador' | '';
 
@@ -30,19 +31,50 @@ export function EditarPessoaModal({ open, onOpenChange, pessoa }: EditarPessoaMo
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [documentType, setDocumentType] = useState<'cpf' | 'rg' | 'outro' | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  // Preencher formulário com dados da pessoa
+  // Preencher formulário com dados da pessoa - busca dados frescos do banco
   useEffect(() => {
-    if (pessoa) {
-      setFormData({
-        nome: pessoa.nome,
-        documento: pessoa.documento,
-        tipo: (pessoa.tipo || '') as TipoPessoa,
-        contato: pessoa.contato || '',
-        placa: pessoa.placa || '',
-      });
-      setErrors({});
-    }
+    const fetchPessoaData = async () => {
+      if (!pessoa || !open) return;
+      
+      setLoading(true);
+      try {
+        // Buscar dados atualizados diretamente do banco
+        const { data, error } = await supabase
+          .from('pessoas')
+          .select('*')
+          .eq('id', pessoa.id)
+          .single();
+        
+        if (error) throw error;
+        
+        if (data) {
+          setFormData({
+            nome: data.nome,
+            documento: data.documento,
+            // Normalizar tipo para minúsculas para funcionar no select
+            tipo: (data.tipo ? data.tipo.toLowerCase() : '') as TipoPessoa,
+            contato: data.contato || '',
+            placa: data.placa || '',
+          });
+        }
+      } catch (err) {
+        // Se der erro, usa os dados do props como fallback (normalizando para minúsculas)
+        setFormData({
+          nome: pessoa.nome,
+          documento: pessoa.documento,
+          tipo: (pessoa.tipo ? pessoa.tipo.toLowerCase() : '') as TipoPessoa,
+          contato: pessoa.contato || '',
+          placa: pessoa.placa || '',
+        });
+      } finally {
+        setLoading(false);
+        setErrors({});
+      }
+    };
+
+    fetchPessoaData();
   }, [pessoa, open]);
 
   const handleChange = (field: string, value: string) => {
@@ -73,11 +105,10 @@ export function EditarPessoaModal({ open, onOpenChange, pessoa }: EditarPessoaMo
     } else if (field === 'contato') {
       processedValue = value.replace(/\D/g, '');
     } else if (field === 'placa') {
-      // Usar normalizarPlaca para formatar com espaços: ABC - 1234
+      // Usar normalizarPlaca para formatar: ABC-1234
       processedValue = normalizarPlaca(value);
-    } else if (field === 'tipo') {
-      processedValue = value.toUpperCase();
     }
+    // Campo tipo não precisa de processamento especial
     
     setFormData(prev => ({ ...prev, [field]: processedValue }));
     if (errors[field]) {
@@ -92,23 +123,8 @@ export function EditarPessoaModal({ open, onOpenChange, pessoa }: EditarPessoaMo
     }
     if (!formData.documento.trim()) {
       newErrors.documento = 'Documento é obrigatório';
-    } else {
-      // Usar validação inteligente: CPF valida algoritmo, RG/outros apenas aceitam
-      const documentoValue = formData.documento.trim();
-      const docValidation = validateDocument(documentoValue);
-      
-      // CPF precisa ser válido
-      if (docValidation.type === 'cpf' && !docValidation.isValid) {
-        newErrors.documento = 'CPF inválido. Por favor, insira um CPF válido.';
-      }
     }
-    if (formData.placa.trim()) {
-      // Validar formato da placa
-      const placaValidation = validatePlaca(formData.placa.trim());
-      if (!placaValidation.isValid) {
-        newErrors.placa = 'Placa inválida. Por favor, insira uma placa no formato ABC - 1234 ou ABC - 1D23.';
-      }
-    }
+    // Removida validação rigorosa de CPF e placa - agora aceita qualquer valor mantendo o formato
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -117,7 +133,7 @@ export function EditarPessoaModal({ open, onOpenChange, pessoa }: EditarPessoaMo
     e.preventDefault();
     if (!validate() || !pessoa) return;
 
-    // Normalizar a placa antes de salvar (adicionar espaços ao redor do hífen se necessário)
+    // Normalizar a placa antes de salvar
     const placaNormalizada = formData.placa ? normalizarPlaca(formData.placa) : '';
 
     atualizarPessoa(pessoa.id, {
@@ -153,131 +169,132 @@ export function EditarPessoaModal({ open, onOpenChange, pessoa }: EditarPessoaMo
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="nome" className="flex items-center gap-2 text-sm font-medium">
-              <FileText className="h-4 w-4 text-muted-foreground" />
-              Nome *
-            </Label>
-            <Input
-              id="nome"
-              placeholder="Nome completo"
-              value={formData.nome}
-              onChange={(e) => handleChange('nome', e.target.value)}
-              className={cn("h-11", errors.nome ? 'border-destructive' : '')}
-            />
-            {errors.nome && (
-              <p className="text-xs text-destructive">{errors.nome}</p>
-            )}
-          </div>
+          {loading ? (
+            <div className="text-center py-8 text-muted-foreground">
+              Carregando dados...
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="nome" className="flex items-center gap-2 text-sm font-medium">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  Nome *
+                </Label>
+                <Input
+                  id="nome"
+                  placeholder="Nome completo"
+                  value={formData.nome}
+                  onChange={(e) => handleChange('nome', e.target.value)}
+                  className={cn("h-11", errors.nome ? 'border-destructive' : '')}
+                />
+                {errors.nome && (
+                  <p className="text-xs text-destructive">{errors.nome}</p>
+                )}
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="documento" className="flex items-center gap-2 text-sm font-medium">
-              <FileText className="h-4 w-4 text-muted-foreground" />
-              Documento *
-            </Label>
-            <Input
-              id="documento"
-              placeholder="CPF, RG ou outro documento (apenas letras e números)"
-              value={formData.documento}
-              onChange={(e) => {
-                // Permitir apenas letras, números e espaços
-                const cleanValue = e.target.value.replace(/[^a-zA-Z0-9\s]/g, '');
-                handleChange('documento', cleanValue);
-              }}
-              onKeyDown={(e) => {
-                // Permitir teclas de controle e caracteres alfanuméricos e espaços
-                const controlKeys = ['Backspace', 'Delete', 'Tab', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', ' '];
-                const allowedKeys = /^[a-zA-Z0-9]$/;
+              <div className="space-y-2">
+                <Label htmlFor="documento" className="flex items-center gap-2 text-sm font-medium">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  Documento *
+                </Label>
+                <Input
+                  id="documento"
+                  placeholder="CPF, RG ou outro documento"
+                  value={formData.documento}
+                  onChange={(e) => {
+                    const cleanValue = e.target.value.replace(/[^a-zA-Z0-9\s]/g, '');
+                    handleChange('documento', cleanValue);
+                  }}
+                  onKeyDown={(e) => {
+                    const controlKeys = ['Backspace', 'Delete', 'Tab', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', ' '];
+                    const allowedKeys = /^[a-zA-Z0-9]$/;
+                    if (!controlKeys.includes(e.key) && !allowedKeys.test(e.key)) {
+                      e.preventDefault();
+                    }
+                  }}
+                  className={cn("h-11", errors.documento ? 'border-destructive' : '')}
+                  maxLength={20}
+                />
+                {errors.documento && (
+                  <p className="text-xs text-destructive">{errors.documento}</p>
+                )}
+              </div>
 
-                if (!controlKeys.includes(e.key) && !allowedKeys.test(e.key)) {
-                  e.preventDefault();
-                }
-              }}
-              className={cn("h-11", errors.documento ? 'border-destructive' : '')}
-              maxLength={20}
-            />
-            {errors.documento && (
-              <p className="text-xs text-destructive">{errors.documento}</p>
-            )}
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="tipo" className="flex items-center gap-2 text-sm font-medium">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  Tipo de Pessoa
+                </Label>
+                <select
+                  id="tipo"
+                  value={formData.tipo}
+                  onChange={(e) => handleChange('tipo', e.target.value)}
+                  className="h-11 px-3 rounded-md border border-input bg-background text-sm"
+                >
+                  <option value="">Selecione um tipo</option>
+                  <option value="cliente">Cliente</option>
+                  <option value="colaborador">Colaborador</option>
+                  <option value="marinheiro">Marinheiro</option>
+                  <option value="prestador">Prestador de Serviço</option>
+                  <option value="proprietario">Proprietário</option>
+                  <option value="visita">Visita</option>
+                </select>
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="tipo" className="flex items-center gap-2 text-sm font-medium">
-              <Users className="h-4 w-4 text-muted-foreground" />
-              Tipo de Pessoa
-            </Label>
-            <select
-              id="tipo"
-              value={formData.tipo}
-              onChange={(e) => handleChange('tipo', e.target.value)}
-              className="h-11 px-3 rounded-md border border-input bg-background text-sm"
-            >
-              <option value="">Selecione um tipo</option>
-              <option value="cliente">Cliente</option>
-              <option value="colaborador">Colaborador</option>
-              <option value="marinheiro">Marinheiro</option>
-              <option value="prestador">Prestador de Serviço</option>
-              <option value="proprietario">Proprietário</option>
-              <option value="visita">Visita</option>
-            </select>
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="contato" className="flex items-center gap-2 text-sm font-medium">
+                  <Phone className="h-4 w-4 text-muted-foreground" />
+                  Contato
+                </Label>
+                <Input
+                  id="contato"
+                  type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="Telefone ou celular"
+                  value={formData.contato}
+                  onChange={(e) => {
+                    const numericValue = e.target.value.replace(/\D/g, '');
+                    handleChange('contato', numericValue);
+                  }}
+                  className="h-11"
+                  maxLength={15}
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="contato" className="flex items-center gap-2 text-sm font-medium">
-              <Phone className="h-4 w-4 text-muted-foreground" />
-              Contato
-            </Label>
-            <Input
-              id="contato"
-              type="tel"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              placeholder="Telefone ou celular (apenas números)"
-              value={formData.contato}
-              onChange={(e) => {
-                // Filtrar apenas números
-                const numericValue = e.target.value.replace(/\D/g, '');
-                handleChange('contato', numericValue);
-              }}
-              className="h-11"
-              maxLength={15}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="placa" className="flex items-center gap-2 text-sm font-medium">
-              <Car className="h-4 w-4 text-muted-foreground" />
-              Placa do veículo
-            </Label>
-            <Input
-              id="placa"
-              placeholder="ABC - 1234"
-              value={formData.placa}
-              onChange={(e) => {
-                // Usar normalizarPlaca para formatar com espaços: ABC - 1234
-                handleChange('placa', e.target.value);
-              }}
-              onKeyDown={(e) => {
-                // Permitir teclas de controle
-                const controlKeys = ['Backspace', 'Delete', 'Tab', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'];
-                
-                if (!controlKeys.includes(e.key) && !/^[a-zA-Z0-9]$/.test(e.key)) {
-                  e.preventDefault();
-                }
-              }}
-              className={cn("h-11 font-mono", errors.placa ? 'border-destructive' : '')}
-              maxLength={9}
-            />
-            {errors.placa && (
-              <p className="text-xs text-destructive">{errors.placa}</p>
-            )}
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="placa" className="flex items-center gap-2 text-sm font-medium">
+                  <Car className="h-4 w-4 text-muted-foreground" />
+                  Placa do veículo
+                </Label>
+                <Input
+                  id="placa"
+                  placeholder="ABC-1234"
+                  value={formData.placa}
+                  onChange={(e) => {
+                    handleChange('placa', e.target.value);
+                  }}
+                  onKeyDown={(e) => {
+                    const controlKeys = ['Backspace', 'Delete', 'Tab', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'];
+                    if (!controlKeys.includes(e.key) && !/^[a-zA-Z0-9]$/.test(e.key)) {
+                      e.preventDefault();
+                    }
+                  }}
+                  className={cn("h-11 font-mono", errors.placa ? 'border-destructive' : '')}
+                  maxLength={8}
+                />
+                {errors.placa && (
+                  <p className="text-xs text-destructive">{errors.placa}</p>
+                )}
+              </div>
+            </>
+          )}
 
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button type="button" variant="outline" onClick={handleClose} className="flex-1">
+            <Button type="button" variant="outline" onClick={handleClose} className="flex-1" disabled={loading}>
               Cancelar
             </Button>
-            <Button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700">
+            <Button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700" disabled={loading}>
               Salvar Alterações
             </Button>
           </DialogFooter>

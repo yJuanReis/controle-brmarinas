@@ -155,55 +155,57 @@ export function Dashboard() {
     <div className="min-h-screen bg-background">
       <Header />
 
-      <main className="container mx-auto px-4 py-6">
+      <main className="w-full px-3 md:px-4 py-6">
         {/* Action buttons */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8 justify-center">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4 mb-6 md:mb-8">
+          
+          {/* Linha 1: Botão Entrada - ocupa toda largura no mobile/tablet, 1 coluna no desktop */}
+          <div className="col-span-1">
+            <Button
+              onClick={() => setShowEntrada(true)}
+              size="lg"
+              className="gap-2 bg-success hover:bg-success/90 w-full h-auto py-3 md:py-4 text-sm md:text-base"
+            >
+              <LogIn className="h-5 w-5" />
+              <div className="text-left">
+                <div className="font-semibold">Registrar Entrada</div>
+              </div>
+            </Button>
+          </div>
 
-          {/* Botao de Registrar Entrada */}
-          <Button
-            onClick={() => setShowEntrada(true)}
-            size="lg"
-            className="gap-2 bg-success hover:bg-success/90 px-6 py-4 text-base h-auto"
-          >
-            <LogIn className="h-5 w-5" />
-            <div className="text-left">
-              <div className="font-semibold">Registrar Entrada</div>
-            </div>
-          </Button>
+          {/* Linha 2: Botões Saída e Atualizar - dividem espaço no mobile/tablet */}
+          <div className="grid grid-cols-2 gap-3 lg:col-span-2">
+            <Button
+              onClick={() => setShowSaidaLote(true)}
+              size="lg"
+              className="gap-2 bg-destructive hover:bg-destructive/90 h-auto py-3 md:py-4 text-sm md:text-base"
+              disabled={pessoasDentro.length === 0}
+            >
+              <LogOut className="h-5 w-5" />
+              <div className="text-left">
+                <div className="font-semibold">Registrar Saída</div>
+              </div>
+            </Button>
 
-          {/* Botao de Saída */}
-          <Button
-            onClick={() => setShowSaidaLote(true)}
-            size="lg"
-            className="gap-2 bg-destructive hover:bg-destructive/90 px-6 py-4 text-base h-auto"
-            disabled={pessoasDentro.length === 0}
-          >
-            <LogOut className="h-5 w-5" />
-            <div className="text-left">
-              <div className="font-semibold">Registrar Saída</div>
-            </div>
-          </Button>
-
-          {/* Botao de Atualizar */}
-          <Button
-            onClick={handleRefresh}
-            variant="outline"
-            size="lg"
-            className="gap-2 px-6 py-4 text-base h-auto"
-            disabled={isRefreshing}
-          >
-            <RefreshCw className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            <div className="text-left">
-              <div className="font-semibold">{isRefreshing ? 'Atualizando...' : 'Atualizar'}</div>
-
-            </div>
-          </Button>
+            <Button
+              onClick={handleRefresh}
+              variant="outline"
+              size="lg"
+              className="gap-2 h-auto py-3 md:py-4 text-sm md:text-base"
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <div className="text-left">
+                <div className="font-semibold">{isRefreshing ? 'Atualizando...' : 'Atualizar'}</div>
+              </div>
+            </Button>
+          </div>
         </div>
 
 
         {/* People inside table */}
-        <div className="card-elevated-md overflow-hidden">
-          <div className="p-5 border-b border-border">
+        <div className="card-elevated-md overflow-hidden w-full">
+          <div className="p-3 md:p-5 border-b border-border">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-display font-semibold flex items-center gap-2">
                 <Users className="h-5 w-5 text-primary" />

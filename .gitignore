@@ -70,3 +70,6 @@ supabase/
 # Arquivos de backup locais
 *.backup
 *.bak
+
+.vercel
+.env*.local

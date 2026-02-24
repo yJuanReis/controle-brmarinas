@@ -11,6 +11,7 @@ import Index from "./pages/Index";
 import Historico from "./pages/Historico";
 import { PessoasPage } from "./pages/Pessoas";
 import { AdminPanel } from "./pages/AdminPanel";
+import { AuditoriaPage } from "./pages/AuditoriaPage";
 import NotFound from "./pages/NotFound";
 import { UnauthorizedPage } from "./pages/UnauthorizedPage";
 import { LoadingPage } from "./components/LoadingPage";
@@ -42,7 +43,8 @@ const App = () => {
       if (!isAuthenticated) {
         return <Navigate to="/login" replace />;
       }
-      if (user?.profile?.role !== 'admin' && user?.profile?.role !== 'owner') {
+      // user do useMarina já é o profile, então usa user?.role diretamente
+      if (user?.role !== 'admin' && user?.role !== 'owner') {
         return <Navigate to="/" replace />;
       }
       return <>{children}</>;
@@ -108,6 +110,18 @@ const App = () => {
             element={
               <ProtectedRoute>
                 <AdminPanel />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Rota para auditoria - apenas admin/owner */}
+          <Route
+            path="/auditoria"
+            element={
+              <ProtectedRoute>
+                <AdminRoute>
+                  <AuditoriaPage />
+                </AdminRoute>
               </ProtectedRoute>
             }
           />

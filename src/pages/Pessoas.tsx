@@ -127,12 +127,15 @@ export function PessoasPage() {
             <Button 
               onClick={() => setShowCadastrar(true)}
               size="lg"
-              className="gap-2 bg-orange-500 hover:bg-orange-600 px-6 py-4 text-base h-auto"
+              className="gap-2 bg-orange-500 hover:bg-orange-600 px-4 md:px-6 py-3 md:py-4 text-sm md:text-base h-auto w-full sm:w-auto"
             >
-              <UserPlus className="h-5 w-5" />
-              <div className="text-left">
+              <UserPlus className="h-4 w-4 md:h-5 md:w-5" />
+              <div className="text-left hidden sm:block">
                 <div className="font-semibold">Cadastrar Pessoa</div>
                 <div className="text-xs opacity-75">Adicionar nova pessoa</div>
+              </div>
+              <div className="text-left sm:hidden">
+                <div className="font-semibold">Cadastrar</div>
               </div>
             </Button>
           </div>

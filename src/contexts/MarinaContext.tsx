@@ -666,7 +666,7 @@ export function MarinaProvider({ children }: { children: ReactNode }) {
       }
       if (filtros.placa) {
         const placa = filtros.placa.toLowerCase();
-        resultado = resultado.filter(m => m.pessoa.placa?.toLowerCase().includes(placa));
+        resultado = resultado.filter(m => m.placa?.toLowerCase().includes(placa) || (!m.placa && m.pessoa.placa?.toLowerCase().includes(placa)));
       }
     }
 

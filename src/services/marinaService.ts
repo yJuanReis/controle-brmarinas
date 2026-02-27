@@ -519,6 +519,7 @@ export async function getPlacasPorPessoa(pessoaId: string): Promise<PlacaPessoa[
 
 /**
  * Adiciona uma nova placa para uma pessoa
+ * Se a pessoa não tiver placa na tabela pessoas, copia a primeira placa automaticamente
  * @param pessoaId ID da pessoa
  * @param placa Placa do veículo
  * @returns Placa criada
@@ -557,6 +558,30 @@ export async function adicionarPlacaPessoa(pessoaId: string, placa: string): Pro
   } catch (error) {
     console.error('[marinaService] Erro ao adicionar placa:', error);
     return null;
+  }
+}
+
+/**
+ * Exclui uma placa da tabela placas_pessoa
+ * @param placaId ID da placa a ser excluída
+ * @returns true se excluído com sucesso
+ */
+export async function excluirPlacaPessoa(placaId: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('placas_pessoa')
+      .delete()
+      .eq('id', placaId);
+
+    if (error) {
+      console.error('[marinaService] Erro ao excluir placa:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('[marinaService] Erro ao excluir placa:', error);
+    return false;
   }
 }
 

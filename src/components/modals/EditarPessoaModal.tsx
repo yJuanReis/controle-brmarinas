@@ -6,11 +6,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useMarina } from '@/contexts/MarinaContext';
 import { Pessoa } from '@/types/marina';
-import { FileText, Phone, Car, Users } from 'lucide-react';
+import { FileText, Phone, Car, Users, Trash2, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { detectDocumentType } from '@/lib/validation';
-import { normalizarPlaca } from '@/lib/validation/formatters';
+import { normalizarPlaca, formatters } from '@/lib/validation/formatters';
 import { supabase } from '@/lib/supabase';
+import { getPlacasPorPessoa, excluirPlacaPessoa, PlacaPessoa } from '@/services/marinaService';
+import { toast } from 'sonner';
 
 type TipoPessoa = 'cliente' | 'visita' | 'marinheiro' | 'proprietario' | 'colaborador' | 'prestador' | '';
 
@@ -27,11 +29,16 @@ export function EditarPessoaModal({ open, onOpenChange, pessoa }: EditarPessoaMo
     documento: '',
     tipo: '' as TipoPessoa,
     contato: '',
-    placa: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [documentType, setDocumentType] = useState<'cpf' | 'rg' | 'outro' | null>(null);
   const [loading, setLoading] = useState(false);
+  
+  // Estados para gerenciar placas
+  const [placasExtras, setPlacasExtras] = useState<PlacaPessoa[]>([]);
+  const [loadingPlacas, setLoadingPlacas] = useState(false);
+  const [novaPlaca, setNovaPlaca] = useState('');
+  const [excluindoPlaca, setExcluindoPlaca] = useState<string | null>(null);
 
   // Preencher formulário com dados da pessoa - busca dados frescos do banco
   useEffect(() => {
@@ -56,7 +63,6 @@ export function EditarPessoaModal({ open, onOpenChange, pessoa }: EditarPessoaMo
             // Normalizar tipo para minúsculas para funcionar no select
             tipo: (data.tipo ? data.tipo.toLowerCase() : '') as TipoPessoa,
             contato: data.contato || '',
-            placa: data.placa || '',
           });
         }
       } catch (err) {
@@ -66,7 +72,6 @@ export function EditarPessoaModal({ open, onOpenChange, pessoa }: EditarPessoaMo
           documento: pessoa.documento,
           tipo: (pessoa.tipo ? pessoa.tipo.toLowerCase() : '') as TipoPessoa,
           contato: pessoa.contato || '',
-          placa: pessoa.placa || '',
         });
       } finally {
         setLoading(false);
@@ -76,6 +81,73 @@ export function EditarPessoaModal({ open, onOpenChange, pessoa }: EditarPessoaMo
 
     fetchPessoaData();
   }, [pessoa, open]);
+
+  // Carregar placas extras da pessoa
+  useEffect(() => {
+    const carregarPlacas = async () => {
+      if (!pessoa || !open) return;
+      
+      setLoadingPlacas(true);
+      try {
+        const placas = await getPlacasPorPessoa(pessoa.id);
+        setPlacasExtras(placas);
+      } catch (err) {
+        console.error('Erro ao carregar placas:', err);
+      } finally {
+        setLoadingPlacas(false);
+      }
+    };
+
+    carregarPlacas();
+  }, [pessoa, open]);
+
+  // Função para adicionar nova placa
+  const handleAdicionarPlaca = async () => {
+    if (!pessoa || !novaPlaca.trim()) return;
+
+    const placaNormalizada = normalizarPlaca(novaPlaca.trim());
+    if (!placaNormalizada) {
+      toast.error('Placa inválida');
+      return;
+    }
+
+    try {
+      const { adicionarPlacaPessoa } = await import('@/services/marinaService');
+      const placaAdicionada = await adicionarPlacaPessoa(pessoa.id, placaNormalizada);
+      
+      if (placaAdicionada) {
+        // Recarregar placas
+        const placas = await getPlacasPorPessoa(pessoa.id);
+        setPlacasExtras(placas);
+        setNovaPlaca('');
+        toast.success('Placa adicionada com sucesso!');
+      }
+    } catch (err) {
+      console.error('Erro ao adicionar placa:', err);
+      toast.error('Erro ao adicionar placa');
+    }
+  };
+
+  // Função para excluir placa
+  const handleExcluirPlaca = async (placaId: string) => {
+    if (!pessoa) return;
+
+    setExcluindoPlaca(placaId);
+    try {
+      const sucesso = await excluirPlacaPessoa(placaId);
+      
+      if (sucesso) {
+        // Atualizar lista local
+        setPlacasExtras(prev => prev.filter(p => p.id !== placaId));
+        toast.success('Placa excluída com sucesso!');
+      }
+    } catch (err) {
+      console.error('Erro ao excluir placa:', err);
+      toast.error('Erro ao excluir placa');
+    } finally {
+      setExcluindoPlaca(null);
+    }
+  };
 
   const handleChange = (field: string, value: string) => {
     let processedValue = value;
@@ -104,9 +176,6 @@ export function EditarPessoaModal({ open, onOpenChange, pessoa }: EditarPessoaMo
       }
     } else if (field === 'contato') {
       processedValue = value.replace(/\D/g, '');
-    } else if (field === 'placa') {
-      // Usar normalizarPlaca para formatar: ABC-1234
-      processedValue = normalizarPlaca(value);
     }
     // Campo tipo não precisa de processamento especial
     
@@ -124,7 +193,6 @@ export function EditarPessoaModal({ open, onOpenChange, pessoa }: EditarPessoaMo
     if (!formData.documento.trim()) {
       newErrors.documento = 'Documento é obrigatório';
     }
-    // Removida validação rigorosa de CPF e placa - agora aceita qualquer valor mantendo o formato
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -133,31 +201,29 @@ export function EditarPessoaModal({ open, onOpenChange, pessoa }: EditarPessoaMo
     e.preventDefault();
     if (!validate() || !pessoa) return;
 
-    // Normalizar a placa antes de salvar
-    const placaNormalizada = formData.placa ? normalizarPlaca(formData.placa) : '';
-
     atualizarPessoa(pessoa.id, {
       nome: formData.nome,
       documento: formData.documento,
       tipo: (formData.tipo as TipoPessoa) || undefined,
       contato: formData.contato || undefined,
-      placa: placaNormalizada || undefined,
     });
 
-    setFormData({ nome: '', documento: '', tipo: '', contato: '', placa: '' });
+    setFormData({ nome: '', documento: '', tipo: '', contato: '' });
     setErrors({});
     onOpenChange(false);
   };
 
   const handleClose = () => {
-    setFormData({ nome: '', documento: '', tipo: '', contato: '', placa: '' });
+    setFormData({ nome: '', documento: '', tipo: '', contato: '' });
     setErrors({});
+    setPlacasExtras([]);
+    setNovaPlaca('');
     onOpenChange(false);
   };
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md p-6" hideCloseButton>
+      <DialogContent className="max-w-2xl p-6" hideCloseButton>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="h-5 w-5 text-primary" />
@@ -221,24 +287,26 @@ export function EditarPessoaModal({ open, onOpenChange, pessoa }: EditarPessoaMo
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="tipo" className="flex items-center gap-2 text-sm font-medium">
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                  Tipo de Pessoa
-                </Label>
-                <select
-                  id="tipo"
-                  value={formData.tipo}
-                  onChange={(e) => handleChange('tipo', e.target.value)}
-                  className="h-11 px-3 rounded-md border border-input bg-background text-sm"
-                >
-                  <option value="">Selecione um tipo</option>
-                  <option value="cliente">Cliente</option>
-                  <option value="colaborador">Colaborador</option>
-                  <option value="marinheiro">Marinheiro</option>
-                  <option value="prestador">Prestador de Serviço</option>
-                  <option value="proprietario">Proprietário</option>
-                  <option value="visita">Visita</option>
-                </select>
+                <div className="flex items-center gap-4">
+                  <Label htmlFor="tipo" className="flex items-center gap-2 flex-shrink-0 text-sm font-medium">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    Tipo de Pessoa
+                  </Label>
+                  <select
+                    id="tipo"
+                    value={formData.tipo}
+                    onChange={(e) => handleChange('tipo', e.target.value)}
+                    className="h-11 px-3 rounded-md border border-input bg-background text-sm flex-1"
+                  >
+                    <option value="">Selecione um tipo</option>
+                    <option value="cliente">Cliente</option>
+                    <option value="colaborador">Colaborador</option>
+                    <option value="marinheiro">Marinheiro</option>
+                    <option value="prestador">Prestador de Serviço</option>
+                    <option value="proprietario">Proprietário</option>
+                    <option value="visita">Visita</option>
+                  </select>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -262,30 +330,85 @@ export function EditarPessoaModal({ open, onOpenChange, pessoa }: EditarPessoaMo
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="placa" className="flex items-center gap-2 text-sm font-medium">
-                  <Car className="h-4 w-4 text-muted-foreground" />
-                  Placa do veículo
-                </Label>
-                <Input
-                  id="placa"
-                  placeholder="ABC-1234"
-                  value={formData.placa}
-                  onChange={(e) => {
-                    handleChange('placa', e.target.value);
-                  }}
-                  onKeyDown={(e) => {
-                    const controlKeys = ['Backspace', 'Delete', 'Tab', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'];
-                    if (!controlKeys.includes(e.key) && !/^[a-zA-Z0-9]$/.test(e.key)) {
-                      e.preventDefault();
-                    }
-                  }}
-                  className={cn("h-11 font-mono", errors.placa ? 'border-destructive' : '')}
-                  maxLength={8}
-                />
-                {errors.placa && (
-                  <p className="text-xs text-destructive">{errors.placa}</p>
+              {/* Seção de Placas */}
+              <div className="space-y-3 border rounded-lg p-4 bg-muted/30">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">
+                    Placas cadastradas
+                  </Label>
+                  <span className="text-xs text-muted-foreground">
+                    {placasExtras.length} plaque(s)
+                  </span>
+                </div>
+
+                {/* Lista de placas */}
+                {loadingPlacas ? (
+                  <div className="text-center py-4 text-muted-foreground text-sm">
+                    Carregando placas...
+                  </div>
+                ) : placasExtras.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {placasExtras.map((placa) => (
+                      <div
+                        key={placa.id}
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-mono border bg-background border-border"
+                      >
+                        <span>{formatters.placa(placa.placa)}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleExcluirPlaca(placa.id)}
+                          disabled={excluindoPlaca === placa.id}
+                          className="p-1 hover:bg-destructive/10 rounded text-destructive disabled:opacity-50"
+                          title="Excluir placa"
+                        >
+                          {excluindoPlaca === placa.id ? (
+                            <div className="h-4 w-4 border-2 border-destructive border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-muted-foreground text-sm">
+                    Nenhuma placa adicional cadastrada
+                  </div>
                 )}
+
+                {/* Adicionar nova placa */}
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Nova placa (ABC-1234)"
+                    value={novaPlaca}
+                    onChange={(e) => {
+                      let value = e.target.value.toUpperCase();
+                      value = value.replace(/[^A-Z0-9-]/g, '');
+                      if (value.length >= 4 && !value.includes('-')) {
+                        value = value.substring(0, 3) + '-' + value.substring(3);
+                      }
+                      setNovaPlaca(value);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAdicionarPlaca();
+                      }
+                    }}
+                    className="h-10 font-mono flex-1"
+                    maxLength={8}
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleAdicionarPlaca}
+                    disabled={!novaPlaca.trim() || novaPlaca.length < 4}
+                    size="sm"
+                    className="h-10"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Adicionar
+                  </Button>
+                </div>
               </div>
             </>
           )}

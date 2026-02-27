@@ -13,7 +13,9 @@ interface AdicionarUsuarioModalProps {
 }
 
 export function AdicionarUsuarioModal({ open, onOpenChange }: AdicionarUsuarioModalProps) {
-  const { adicionarUsuario, empresas } = useMarina();
+  const { adicionarUsuario, empresas, user } = useMarina();
+  const isOwner = user?.role === 'owner';
+  
   const [formData, setFormData] = useState({
     nome: '',
     email: '',
@@ -25,6 +27,10 @@ export function AdicionarUsuarioModal({ open, onOpenChange }: AdicionarUsuarioMo
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleChange = (field: string, value: string) => {
+    // Se o campo for role e o valor for 'owner', mas o usuário não é owner, ignorar
+    if (field === 'role' && value === 'owner' && !isOwner) {
+      return;
+    }
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
@@ -225,7 +231,7 @@ export function AdicionarUsuarioModal({ open, onOpenChange }: AdicionarUsuarioMo
             >
               <option value="user">Usuário</option>
               <option value="admin">Administrador</option>
-              <option value="owner">Dono</option>
+              {isOwner && <option value="owner">Dono</option>}
             </select>
           </div>
 

@@ -44,7 +44,8 @@ import {
   Phone,
   ArrowUp,
   RefreshCw,
-  ChevronDown
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -54,7 +55,6 @@ import { formatters } from '@/lib/validation';
 export function HistoricoPage() {
   const { getHistoricoMovimentacoes } = useMarina();
   
-  // Estado de filtros específicos (mantém a lógica existente)
   const [filtros, setFiltros] = useState({
     dataInicio: '',
     dataFim: '',
@@ -64,10 +64,8 @@ export function HistoricoPage() {
     placa: '',
   });
 
-  // Estado de busca global (novo)
   const [globalSearch, setGlobalSearch] = useState('');
 
-  // Estado de paginação organizado
   const [pagination, setPagination] = useState({
     list: { page: 1, pageSize: 50 },
     daily: { page: 1, pageSize: 50 }
@@ -82,37 +80,70 @@ export function HistoricoPage() {
   });
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
+  // Mobile card expand state for list view
+  const [expandedListCards, setExpandedListCards] = useState<Set<string>>(new Set());
+  // Mobile card expand state for daily view items
+  const [expandedDailyItems, setExpandedDailyItems] = useState<Set<string>>(new Set());
+  // Paginação interna para cada dia na visualização diário
+  const [dailyPagination, setDailyPagination] = useState<{ [key: string]: { page: number; pageSize: number } }>({});
 
-  // Funções para controle de expansão dos cards
+  // Funções para gerenciar paginação interna de cada dia
+  const getDayPagination = useCallback((data: string) => {
+    return dailyPagination[data] || { page: 1, pageSize: 10 };
+  }, [dailyPagination]);
+
+  const handleDayPageChange = useCallback((data: string, newPage: number) => {
+    setDailyPagination(prev => ({
+      ...prev,
+      [data]: { ...(prev[data] || { page: 1, pageSize: 10 }), page: newPage }
+    }));
+  }, []);
+
+  const handleDayPageSizeChange = useCallback((data: string, newPageSize: number) => {
+    setDailyPagination(prev => ({
+      ...prev,
+      [data]: { ...(prev[data] || { page: 1, pageSize: 10 }), pageSize: newPageSize, page: 1 }
+    }));
+  }, []);
+
   const toggleDayExpansion = useCallback((data: string) => {
     setExpandedDays(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(data)) {
-        newSet.delete(data);
-      } else {
-        newSet.add(data);
-      }
+      if (newSet.has(data)) newSet.delete(data);
+      else newSet.add(data);
       return newSet;
     });
   }, []);
 
-  const isDayExpanded = useCallback((data: string) => {
-    return expandedDays.has(data);
-  }, [expandedDays]);
+  const isDayExpanded = useCallback((data: string) => expandedDays.has(data), [expandedDays]);
 
-  // Efeito para controlar visibilidade do botão flutuante
+  const toggleListCard = useCallback((id: string) => {
+    setExpandedListCards(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleDailyItem = useCallback((id: string) => {
+    setExpandedDailyItems(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     const handleScroll = () => {
       const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
       setShowScrollTop(scrollTop > 300);
     };
-
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Pipeline de filtragem otimizado
-  // 1. Dados brutos do useMarina()
   const dadosBrutos = useMemo(() => {
     return getHistoricoMovimentacoes({
       dataInicio: filtros.dataInicio || undefined,
@@ -124,13 +155,10 @@ export function HistoricoPage() {
     });
   }, [filtros, getHistoricoMovimentacoes]);
 
-  // 2. Busca global (com debounce integrado)
   const dadosFiltrados = useMemo(() => {
     if (!globalSearch.trim()) return dadosBrutos;
-    
     const termo = globalSearch.toLowerCase().trim();
     return dadosBrutos.filter(mov => {
-      // Busca em campos relevantes
       const campos = [
         mov.pessoa.nome,
         mov.pessoa.documento,
@@ -139,29 +167,16 @@ export function HistoricoPage() {
         mov.pessoa.tipo,
         mov.observacao
       ].filter(Boolean);
-      
-      return campos.some(campo => 
-        campo.toString().toLowerCase().includes(termo)
-      );
+      return campos.some(campo => campo.toString().toLowerCase().includes(termo));
     });
   }, [dadosBrutos, globalSearch]);
 
-  // 3. Paginação
-  const dadosPaginados = useMemo(() => {
-    const { page, pageSize } = viewMode === 'list' ? pagination.list : pagination.daily;
-    const startIndex = (page - 1) * pageSize;
-    return dadosFiltrados.slice(startIndex, startIndex + pageSize);
-  }, [dadosFiltrados, pagination, viewMode]);
-
-  // Verifica se há filtros ativos
   const hasActiveFilters = useMemo(() => {
     return Object.values(filtros).some(v => v !== '') || globalSearch.trim() !== '';
   }, [filtros, globalSearch]);
 
-  // Handlers otimizados com useCallback
   const handleFiltroChange = useCallback((campo: keyof typeof filtros, valor: string) => {
     setFiltros(prev => ({ ...prev, [campo]: valor }));
-    // Resetar página ao alterar filtros
     setPagination(prev => ({
       ...prev,
       list: { ...prev.list, page: 1 },
@@ -171,7 +186,6 @@ export function HistoricoPage() {
 
   const handleGlobalSearchChange = useCallback((valor: string) => {
     setGlobalSearch(valor);
-    // Resetar página ao alterar busca global
     setPagination(prev => ({
       ...prev,
       list: { ...prev.list, page: 1 },
@@ -180,36 +194,19 @@ export function HistoricoPage() {
   }, []);
 
   const clearAllFilters = useCallback(() => {
-    setFiltros({
-      dataInicio: '',
-      dataFim: '',
-      tipo: '',
-      nome: '',
-      documento: '',
-      placa: '',
-    });
+    setFiltros({ dataInicio: '', dataFim: '', tipo: '', nome: '', documento: '', placa: '' });
     setGlobalSearch('');
-    setPagination({
-      list: { page: 1, pageSize: 50 },
-      daily: { page: 1, pageSize: 50 }
-    });
+    setPagination({ list: { page: 1, pageSize: 50 }, daily: { page: 1, pageSize: 50 } });
   }, []);
 
-  // Controle de paginação
   const handlePageChange = useCallback((newPage: number) => {
     const key = viewMode === 'list' ? 'list' : 'daily';
-    setPagination(prev => ({
-      ...prev,
-      [key]: { ...prev[key], page: newPage }
-    }));
+    setPagination(prev => ({ ...prev, [key]: { ...prev[key], page: newPage } }));
   }, [viewMode]);
 
   const handlePageSizeChange = useCallback((newPageSize: number) => {
     const key = viewMode === 'list' ? 'list' : 'daily';
-    setPagination(prev => ({
-      ...prev,
-      [key]: { ...prev[key], pageSize: newPageSize, page: 1 }
-    }));
+    setPagination(prev => ({ ...prev, [key]: { ...prev[key], pageSize: newPageSize, page: 1 } }));
   }, [viewMode]);
 
   const formatDateTime = (dateStr: string) => {
@@ -233,42 +230,73 @@ export function HistoricoPage() {
     return format(date, "HH:mm", { locale: ptBR });
   };
 
-  // Pagination helpers
   const getPaginatedItems = (items: any[], currentPage: number, pageSize: number) => {
     const startIndex = (currentPage - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    return items.slice(startIndex, endIndex);
+    return items.slice(startIndex, startIndex + pageSize);
   };
 
-  const getTotalPages = (totalItems: number, pageSize: number) => {
-    return Math.ceil(totalItems / pageSize);
-  };
+  const getTotalPages = (totalItems: number, pageSize: number) => Math.ceil(totalItems / pageSize);
 
-  // Agrupar movimentações por dia
   const movimentacoesPorDia = useMemo(() => {
     const grupos: { [key: string]: MovimentacaoComPessoa[] } = {};
-
     dadosFiltrados.forEach(mov => {
       const data = format(new Date(mov.entrada_em), 'yyyy-MM-dd');
-      if (!grupos[data]) {
-        grupos[data] = [];
-      }
+      if (!grupos[data]) grupos[data] = [];
       grupos[data].push(mov);
     });
-
-    // Ordenar dias em ordem decrescente (mais recente primeiro)
     return Object.entries(grupos)
       .sort(([a], [b]) => b.localeCompare(a))
       .map(([data, movs]) => ({
         data,
         dataFormatada: formatDate(movs[0].entrada_em),
-        movimentacoes: movs.sort((a, b) =>
-          new Date(b.entrada_em).getTime() - new Date(a.entrada_em).getTime()
-        ),
+        movimentacoes: movs.sort((a, b) => new Date(b.entrada_em).getTime() - new Date(a.entrada_em).getTime()),
         totalEntradas: movs.length,
         dentroAgora: movs.filter(m => m.status === 'DENTRO').length,
       }));
   }, [dadosFiltrados, formatDate]);
+
+  // ─── Reusable Pagination Component ───────────────────────────────────────────
+  const PaginationBar = ({ total, page, pageSize, label }: { total: number; page: number; pageSize: number; label: string }) => {
+    const totalPages = getTotalPages(total, pageSize);
+    if (totalPages <= 1) return null;
+    return (
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-border">
+        <div className="text-sm text-black">
+          Mostrando {Math.min((page - 1) * pageSize + 1, total)} a {Math.min(page * pageSize, total)} de {total} {label}
+        </div>
+        <Pagination>
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={() => handlePageChange(page - 1)}
+                className={page <= 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+              />
+            </PaginationItem>
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              let pageNum: number;
+              if (totalPages <= 5) pageNum = i + 1;
+              else if (page <= 3) pageNum = i + 1;
+              else if (page >= totalPages - 2) pageNum = totalPages - 4 + i;
+              else pageNum = page - 2 + i;
+              return (
+                <PaginationItem key={pageNum}>
+                  <PaginationLink onClick={() => handlePageChange(pageNum)} isActive={page === pageNum} className="cursor-pointer">
+                    {pageNum}
+                  </PaginationLink>
+                </PaginationItem>
+              );
+            })}
+            <PaginationItem>
+              <PaginationNext
+                onClick={() => handlePageChange(page + 1)}
+                className={page >= totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -277,7 +305,6 @@ export function HistoricoPage() {
       <main className="container mx-auto px-4 py-6">
         {/* Filters panel */}
         <div className="card-elevated p-5 mb-6">
-          {/* Header: Título + Toggle Lista/Diário */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 pb-4 border-b border-border/50">
             <div className="flex items-center gap-3">
               <History className="h-6 w-6 text-primary" />
@@ -291,7 +318,6 @@ export function HistoricoPage() {
               </div>
             </div>
             
-            {/* Toggle View Mode */}
             <div className="flex rounded-lg border border-border p-1 bg-muted/30">
               <Button
                 size="sm"
@@ -314,7 +340,6 @@ export function HistoricoPage() {
             </div>
           </div>
 
-          {/* Busca global */}
           <div className="mt-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -337,37 +362,18 @@ export function HistoricoPage() {
             </div>
           </div>
 
-          {/* Filtros avançados compactos */}
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {/* Data início */}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 mt-4">
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Data início</Label>
-              <Input
-                type="date"
-                value={filtros.dataInicio}
-                onChange={(e) => handleFiltroChange('dataInicio', e.target.value)}
-                className="h-9 text-sm border-border/50"
-              />
+              <Input type="date" value={filtros.dataInicio} onChange={(e) => handleFiltroChange('dataInicio', e.target.value)} className="h-9 text-sm border-border/50" />
             </div>
-
-            {/* Data fim */}
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Data fim</Label>
-              <Input
-                type="date"
-                value={filtros.dataFim}
-                onChange={(e) => handleFiltroChange('dataFim', e.target.value)}
-                className="h-9 text-sm border-border/50"
-              />
+              <Input type="date" value={filtros.dataFim} onChange={(e) => handleFiltroChange('dataFim', e.target.value)} className="h-9 text-sm border-border/50" />
             </div>
-
-            {/* Tipo */}
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Tipo</Label>
-              <Select
-                value={filtros.tipo}
-                onValueChange={(value) => handleFiltroChange('tipo', value)}
-              >
+              <Select value={filtros.tipo} onValueChange={(value) => handleFiltroChange('tipo', value)}>
                 <SelectTrigger className="h-9 text-sm border-border/50">
                   <SelectValue placeholder="Selecione o tipo..." />
                 </SelectTrigger>
@@ -381,42 +387,20 @@ export function HistoricoPage() {
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Nome */}
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Nome</Label>
-              <Input
-                placeholder="Buscar por nome..."
-                value={filtros.nome}
-                onChange={(e) => handleFiltroChange('nome', e.target.value)}
-                className="h-9 text-sm border-border/50"
-              />
+              <Input placeholder="Buscar por nome..." value={filtros.nome} onChange={(e) => handleFiltroChange('nome', e.target.value)} className="h-9 text-sm border-border/50" />
             </div>
-
-            {/* Documento */}
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Documento</Label>
-              <Input
-                placeholder="CPF, RG..."
-                value={filtros.documento}
-                onChange={(e) => handleFiltroChange('documento', e.target.value)}
-                className="h-9 text-sm border-border/50"
-              />
+              <Input placeholder="CPF, RG..." value={filtros.documento} onChange={(e) => handleFiltroChange('documento', e.target.value)} className="h-9 text-sm border-border/50" />
             </div>
-
-            {/* Placa */}
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Placa</Label>
-              <Input
-                placeholder="ABC-1234"
-                value={filtros.placa}
-                onChange={(e) => handleFiltroChange('placa', e.target.value.toUpperCase())}
-                className="h-9 text-sm border-border/50"
-              />
+              <Input placeholder="ABC-1234" value={filtros.placa} onChange={(e) => handleFiltroChange('placa', e.target.value.toUpperCase())} className="h-9 text-sm border-border/50" />
             </div>
           </div>
 
-          {/* Paginação compacta */}
           {dadosFiltrados.length > 0 && (
             <div className="mt-4 pt-3 border-t border-border/50">
               <div className="flex items-center justify-between">
@@ -424,13 +408,8 @@ export function HistoricoPage() {
                   {viewMode === 'list' && (
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground">Registros por página:</span>
-                      <Select 
-                        value={pagination.list.pageSize.toString()} 
-                        onValueChange={(value) => handlePageSizeChange(parseInt(value))}
-                      >
-                        <SelectTrigger className="w-20 h-8 text-sm border-border/50">
-                          <SelectValue />
-                        </SelectTrigger>
+                      <Select value={pagination.list.pageSize.toString()} onValueChange={(value) => handlePageSizeChange(parseInt(value))}>
+                        <SelectTrigger className="w-20 h-8 text-sm border-border/50"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="25">25</SelectItem>
                           <SelectItem value="50">50</SelectItem>
@@ -442,13 +421,8 @@ export function HistoricoPage() {
                   {viewMode === 'daily' && (
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground">Dias por página:</span>
-                      <Select
-                        value={pagination.daily.pageSize.toString()}
-                        onValueChange={(value) => handlePageSizeChange(parseInt(value))}
-                      >
-                        <SelectTrigger className="w-20 h-8 text-sm border-border/50">
-                          <SelectValue />
-                        </SelectTrigger>
+                      <Select value={pagination.daily.pageSize.toString()} onValueChange={(value) => handlePageSizeChange(parseInt(value))}>
+                        <SelectTrigger className="w-20 h-8 text-sm border-border/50"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="25">25</SelectItem>
                           <SelectItem value="50">50</SelectItem>
@@ -458,19 +432,12 @@ export function HistoricoPage() {
                     </div>
                   )}
                 </div>
-
                 <div className="text-xs text-muted-foreground">
                   {viewMode === 'list' && (
-                    <>
-                      Mostrando {Math.min((pagination.list.page - 1) * pagination.list.pageSize + 1, dadosFiltrados.length)} a{' '}
-                      {Math.min(pagination.list.page * pagination.list.pageSize, dadosFiltrados.length)} de {dadosFiltrados.length} registros
-                    </>
+                    <>Mostrando {Math.min((pagination.list.page - 1) * pagination.list.pageSize + 1, dadosFiltrados.length)} a {Math.min(pagination.list.page * pagination.list.pageSize, dadosFiltrados.length)} de {dadosFiltrados.length} registros</>
                   )}
                   {viewMode === 'daily' && (
-                    <>
-                      Mostrando {Math.min((pagination.daily.page - 1) * pagination.daily.pageSize + 1, movimentacoesPorDia.length)} a{' '}
-                      {Math.min(pagination.daily.page * pagination.daily.pageSize, movimentacoesPorDia.length)} de {movimentacoesPorDia.length} dias
-                    </>
+                    <>Mostrando {Math.min((pagination.daily.page - 1) * pagination.daily.pageSize + 1, movimentacoesPorDia.length)} a {Math.min(pagination.daily.page * pagination.daily.pageSize, movimentacoesPorDia.length)} de {movimentacoesPorDia.length} dias</>
                   )}
                 </div>
               </div>
@@ -478,11 +445,11 @@ export function HistoricoPage() {
           )}
         </div>
 
-        {/* Content based on view mode */}
+        {/* ════════════════════════════════════════════════════════════════
+            DAILY VIEW
+        ════════════════════════════════════════════════════════════════ */}
         {viewMode === 'daily' ? (
-          /* Daily View */
           <div className="space-y-4">
-
             {movimentacoesPorDia.length === 0 ? (
               <div className="card-elevated p-12 text-center">
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted mx-auto mb-4">
@@ -490,323 +457,482 @@ export function HistoricoPage() {
                 </div>
                 <h4 className="font-medium text-black mb-1">Nenhum registro encontrado</h4>
                 <p className="text-sm text-black">
-                  {hasActiveFilters
-                    ? 'Tente ajustar os filtros de busca'
-                    : 'O histórico aparecerá aqui conforme as movimentações forem registradas'}
+                  {hasActiveFilters ? 'Tente ajustar os filtros de busca' : 'O histórico aparecerá aqui conforme as movimentações forem registradas'}
                 </p>
               </div>
             ) : (
               <>
-            {getPaginatedItems(movimentacoesPorDia, pagination.daily.page, pagination.daily.pageSize).map((dia, diaIndex) => (
-                  <div
-                    key={dia.data}
-                    className="card-elevated animate-fade-in"
-                    style={{ animationDelay: `${diaIndex * 100}ms` }}
-                  >
+                {getPaginatedItems(movimentacoesPorDia, pagination.daily.page, pagination.daily.pageSize).map((dia, diaIndex) => (
+                  <div key={dia.data} className="card-elevated animate-fade-in" style={{ animationDelay: `${diaIndex * 100}ms` }}>
                     {/* Day Header */}
-                    <div className="p-5 border-b border-border bg-gradient-to-r from-primary/5 to-primary/10">
+                    <div className="p-4 md:p-5 border-b border-border bg-gradient-to-r from-primary/5 to-primary/10">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 flex-shrink-0">
                             <CalendarDays className="h-5 w-5 text-primary" />
                           </div>
                           <div>
-                            <h3 className="font-semibold text-lg text-foreground">{dia.dataFormatada}</h3>
+                            <h3 className="font-semibold text-base md:text-lg text-foreground">{dia.dataFormatada}</h3>
                             <p className="text-sm text-black">
                               {dia.totalEntradas} entrada{dia.totalEntradas !== 1 ? 's' : ''}
                               {dia.dentroAgora > 0 && (
-                                <span className="ml-2 text-success font-medium">
-                                  • {dia.dentroAgora} ainda dentro
-                                </span>
+                                <span className="ml-2 text-success font-medium">• {dia.dentroAgora} dentro</span>
                               )}
                             </p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
-                            <div className="flex items-center gap-2 text-sm">
-                              <LogIn className="h-4 w-4 text-success" />
-                              <span className="font-medium text-success">{dia.totalEntradas}</span>
-                            </div>
-                            {dia.dentroAgora > 0 && (
-                              <div className="flex items-center gap-2 text-sm mt-1">
-                                <div className="h-2 w-2 rounded-full bg-success animate-pulse-soft" />
-                                <span className="text-success">{dia.dentroAgora}</span>
-                              </div>
-                            )}
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => toggleDayExpansion(dia.data)}
-                            className="gap-2 text-sm"
-                          >
-                            <span className={cn(
-                              "transition-transform duration-200",
-                              isDayExpanded(dia.data) ? "rotate-180" : "rotate-0"
-                            )}>
-                              <ChevronDown className="h-4 w-4" />
-                            </span>
-                            <span>{isDayExpanded(dia.data) ? 'Recolher' : 'Expandir'}</span>
-                          </Button>
-                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleDayExpansion(dia.data)}
+                          className="gap-1.5 text-sm flex-shrink-0"
+                        >
+                          <span className={cn("transition-transform duration-200", isDayExpanded(dia.data) ? "rotate-180" : "rotate-0")}>
+                            <ChevronDown className="h-4 w-4" />
+                          </span>
+                          <span className="hidden sm:inline">{isDayExpanded(dia.data) ? 'Recolher' : 'Expandir'}</span>
+                        </Button>
                       </div>
                     </div>
 
                     {/* Day Movements */}
-                    <div
-                      className={cn(
-                        "overflow-hidden transition-all duration-300 ease-in-out",
-                        isDayExpanded(dia.data) ? "max-h-[5000px] opacity-100" : "max-h-0 opacity-0"
-                      )}
-                    >
-                      <div className="divide-y divide-border">
-{dia.movimentacoes.map((mov, movIndex) => (
-                        <React.Fragment key={mov.id}>
-                          {/* Linha principal */}
-                          <div
-                            key={mov.id}
-                            className="p-5 hover:bg-muted/30 transition-colors cursor-pointer"
-                            onClick={() => {
-                              const details = document.getElementById(`details-${mov.id}`);
-                              if (details) {
-                                if (details.style.display === 'none' || !details.style.display) {
-                                  details.style.display = 'block';
-                                } else {
-                                  details.style.display = 'none';
-                                }
-                              }
-                            }}
+                    <div className={cn(
+                      "overflow-hidden transition-all duration-300 ease-in-out",
+                      isDayExpanded(dia.data) ? "max-h-[5000px] opacity-100" : "max-h-0 opacity-0"
+                    )}>
+                      {/* Paginação interna do dia */}
+                      {dia.totalEntradas > 10 && isDayExpanded(dia.data) && (
+                        <div className="flex items-center justify-between p-3 bg-muted/30 border-b border-border">
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDayPageChange(dia.data, getDayPagination(dia.data).page - 1)}
+                              disabled={getDayPagination(dia.data).page <= 1}
+                              className="h-7 px-2"
+                            >
+                              <ChevronDown className="h-4 w-4 rotate-90" />
+                            </Button>
+                            <span className="text-xs text-muted-foreground">
+                              {getDayPagination(dia.data).page} / {getTotalPages(dia.totalEntradas, getDayPagination(dia.data).pageSize)}
+                            </span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDayPageChange(dia.data, getDayPagination(dia.data).page + 1)}
+                              disabled={getDayPagination(dia.data).page >= getTotalPages(dia.totalEntradas, getDayPagination(dia.data).pageSize)}
+                              className="h-7 px-2"
+                            >
+                              <ChevronDown className="h-4 w-4 -rotate-90" />
+                            </Button>
+                          </div>
+                          <Select 
+                            value={getDayPagination(dia.data).pageSize.toString()} 
+                            onValueChange={(value) => handleDayPageSizeChange(dia.data, parseInt(value))}
                           >
-                            <div className="flex items-start justify-between gap-4">
-                              {/* Left side - Person info */}
-                              <div className="flex items-start gap-4 flex-1 min-w-0">
-                                <UserTypeAvatar pessoa={mov.pessoa} />
-                                <div className="flex-1 min-w-0 space-y-2">
-                                  {/* Name and document */}
-                                  <div>
-                                    <p className="font-medium text-foreground truncate">
+                            <SelectTrigger className="w-20 h-7 text-xs border-border/50">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="5">5</SelectItem>
+                              <SelectItem value="10">10</SelectItem>
+                              <SelectItem value="15">15</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                      <div className="divide-y divide-border">
+                        {getPaginatedItems(dia.movimentacoes, getDayPagination(dia.data).page, getDayPagination(dia.data).pageSize).map((mov) => {
+                          const isDailyItemExpanded = expandedDailyItems.has(mov.id);
+                          return (
+                            <React.Fragment key={mov.id}>
+                              {/* ── Mobile Daily Item Card (≤750px) ── */}
+                              <div
+                                className="block min-[751px]:hidden p-3 cursor-pointer select-none active:bg-muted/40 transition-colors"
+                                onClick={() => toggleDailyItem(mov.id)}
+                              >
+                                {/* Top row */}
+                                <div className="flex items-center gap-3 mb-2">
+                                  <UserTypeAvatar pessoa={mov.pessoa} />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-black text-base truncate leading-tight">
                                       {mov.pessoa.nome}
                                     </p>
-                                    <div className="flex items-center gap-2 text-sm text-black">
-                                      <FileText className="h-3.5 w-3.5" />
-                                      <span>{mov.pessoa.documento}</span>
-                                    </div>
+                                    {/* Observação sempre visível abaixo do nome */}
+                                    {mov.observacao ? (
+                                      <p className="text-xs text-black/70 mt-0.5 line-clamp-2 whitespace-pre-wrap">
+                                        {mov.observacao}
+                                      </p>
+                                    ) : (
+                                      <p className="text-xs text-red-500 font-medium mt-0.5">⚠️ Observação obrigatória</p>
+                                    )}
                                   </div>
+                                  {/* Chevron indicator */}
+                                  <div className="text-black/40 flex-shrink-0 transition-transform duration-200" style={{ transform: isDailyItemExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                                    <ChevronDown className="h-4 w-4" />
+                                  </div>
+                                </div>
 
-                                  {/* Type and contact */}
-                                  <div className="flex flex-wrap items-center gap-4 text-sm">
-                                    {mov.pessoa.tipo && (
-                                      <span className="text-xs font-medium bg-primary/10 text-primary px-2.5 py-1 rounded-full">
-                                        {mov.pessoa.tipo.charAt(0).toUpperCase() + mov.pessoa.tipo.slice(1)}
-                                      </span>
-                                    )}
+                                {/* Status + tipo + entrada — sempre visível */}
+                                <div className="flex items-center gap-2 pl-11 mb-3 flex-wrap">
+                                  {mov.pessoa.tipo && (
+                                    <span className="text-xs font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                      {mov.pessoa.tipo.charAt(0).toUpperCase() + mov.pessoa.tipo.slice(1)}
+                                    </span>
+                                  )}
+                                  <span className={cn(
+                                    "text-xs font-medium flex items-center gap-1",
+                                    mov.status === 'DENTRO' ? "text-success" : "text-muted-foreground"
+                                  )}>
+                                    <span className={cn("h-1.5 w-1.5 rounded-full inline-block", mov.status === 'DENTRO' ? "bg-success animate-pulse-soft" : "bg-muted-foreground")} />
+                                    {mov.status === 'DENTRO' ? 'Dentro' : 'Saiu'}
+                                  </span>
+                                  <span className="flex items-center gap-1 text-xs text-black">
+                                    <LogIn className="h-3 w-3 text-success" />
+                                    {formatTime(mov.entrada_em)}
+                                  </span>
+                                  {mov.saida_em && (
+                                    <span className="flex items-center gap-1 text-xs text-black">
+                                      <LogOut className="h-3 w-3 text-destructive" />
+                                      {formatTime(mov.saida_em)}
+                                    </span>
+                                  )}
+                                </div>
 
-                                    {mov.pessoa.contato && (
-                                      <div className="flex items-center gap-1 text-black">
-                                        <Phone className="h-3 w-3" />
-                                        <span>{mov.pessoa.contato}</span>
-                                      </div>
-                                    )}
-
+                                {/* Expandable details */}
+                                {isDailyItemExpanded && (
+                                  <div className="pl-11 mb-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                                    <div>
+                                      <p className="text-xs text-black/50 uppercase tracking-wide font-medium mb-0.5">Documento</p>
+                                      <p className="text-black text-xs">{mov.pessoa.documento || '—'}</p>
+                                    </div>
                                     {(mov.placa || mov.pessoa.placa) && (
-                                      <div className="flex items-center gap-2">
-                                        <Car className="h-3 w-3 text-black" />
-                                        <span className="font-mono bg-muted px-2 py-0.5 rounded text-xs">
+                                      <div>
+                                        <p className="text-xs text-black/50 uppercase tracking-wide font-medium mb-0.5">Placa</p>
+                                        <p className="font-mono bg-muted px-2 py-0.5 rounded text-xs inline-block">
                                           {formatters.placa(mov.placa || mov.pessoa.placa || '')}
-                                        </span>
+                                        </p>
+                                      </div>
+                                    )}
+                                    {mov.pessoa.contato && (
+                                      <div>
+                                        <p className="text-xs text-black/50 uppercase tracking-wide font-medium mb-0.5">Contato</p>
+                                        <p className="text-black text-xs">{mov.pessoa.contato}</p>
                                       </div>
                                     )}
                                   </div>
+                                )}
 
-                                  {/* Times */}
-                                  <div className="flex flex-wrap items-center gap-6 text-sm">
-                                    <div className="flex items-center gap-2">
-                                      <LogIn className="h-4 w-4 text-success" />
+                                {/* Action buttons — stop propagation */}
+                                <div className="grid grid-cols-2 gap-2" onClick={(e) => e.stopPropagation()}>
+                                  <Button
+                                    size="default"
+                                    variant="outline"
+                                    onClick={() => setEditandoMovimentacao(mov)}
+                                    className="gap-2 h-11 text-sm font-medium w-full"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                    Editar
+                                  </Button>
+                                  {mov.status === 'DENTRO' ? (
+                                    <Button
+                                      size="default"
+                                      variant="destructive"
+                                      onClick={() => setSaidaModal({ open: true, pessoa: { movimentacaoId: mov.id, pessoa: mov.pessoa, entradaEm: mov.entrada_em } })}
+                                      className="gap-2 h-11 text-sm font-medium w-full"
+                                    >
+                                      <LogOut className="h-4 w-4" />
+                                      Saída
+                                    </Button>
+                                  ) : (
+                                    <div />
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* ── Desktop Daily Item (≥751px) ── */}
+                              <div
+                                className="hidden min-[751px]:block p-5 hover:bg-muted/30 transition-colors cursor-pointer"
+                                onClick={() => {
+                                  const details = document.getElementById(`details-daily-${mov.id}`);
+                                  if (details) {
+                                    details.style.display = details.style.display === 'none' || !details.style.display ? 'block' : 'none';
+                                  }
+                                }}
+                              >
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="flex items-start gap-4 flex-1 min-w-0">
+                                    <UserTypeAvatar pessoa={mov.pessoa} />
+                                    <div className="flex-1 min-w-0 space-y-2">
                                       <div>
-                                        <p className="font-medium text-black">{formatDate(mov.entrada_em)}</p>
-                                        <p className="text-xs text-black">{formatTime(mov.entrada_em)}</p>
-                                      </div>
-                                    </div>
-
-                                    {mov.saida_em && (
-                                      <div className="flex items-center gap-2">
-                                        <LogOut className="h-4 w-4 text-destructive" />
-                                        <div>
-                                          <p className="font-medium text-black">{formatDate(mov.saida_em)}</p>
-                                          <p className="text-xs text-black">{formatTime(mov.saida_em)}</p>
+                                        <p className="font-medium text-foreground truncate">{mov.pessoa.nome}</p>
+                                        <div className="flex items-center gap-2 text-sm text-black">
+                                          <FileText className="h-3.5 w-3.5" />
+                                          <span>{mov.pessoa.documento}</span>
                                         </div>
                                       </div>
-                                    )}
+                                      <div className="flex flex-wrap items-center gap-4 text-sm">
+                                        {mov.pessoa.tipo && (
+                                          <span className="text-xs font-medium bg-primary/10 text-primary px-2.5 py-1 rounded-full">
+                                            {mov.pessoa.tipo.charAt(0).toUpperCase() + mov.pessoa.tipo.slice(1)}
+                                          </span>
+                                        )}
+                                        {mov.pessoa.contato && (
+                                          <div className="flex items-center gap-1 text-black">
+                                            <Phone className="h-3 w-3" />
+                                            <span>{mov.pessoa.contato}</span>
+                                          </div>
+                                        )}
+                                        {(mov.placa || mov.pessoa.placa) && (
+                                          <div className="flex items-center gap-2">
+                                            <Car className="h-3 w-3 text-black" />
+                                            <span className="font-mono bg-muted px-2 py-0.5 rounded text-xs">
+                                              {formatters.placa(mov.placa || mov.pessoa.placa || '')}
+                                            </span>
+                                          </div>
+                                        )}
+                                      </div>
+                                      <div className="flex flex-wrap items-center gap-6 text-sm">
+                                        <div className="flex items-center gap-2">
+                                          <LogIn className="h-4 w-4 text-success" />
+                                          <div>
+                                            <p className="font-medium text-black">{formatDate(mov.entrada_em)}</p>
+                                            <p className="text-xs text-black">{formatTime(mov.entrada_em)}</p>
+                                          </div>
+                                        </div>
+                                        {mov.saida_em && (
+                                          <div className="flex items-center gap-2">
+                                            <LogOut className="h-4 w-4 text-destructive" />
+                                            <div>
+                                              <p className="font-medium text-black">{formatDate(mov.saida_em)}</p>
+                                              <p className="text-xs text-black">{formatTime(mov.saida_em)}</p>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex flex-col items-end gap-3 flex-shrink-0">
+                                    <span className={mov.status === 'DENTRO' ? 'status-inside' : 'status-outside'}>
+                                      <span className={cn("h-2 w-2 rounded-full", mov.status === 'DENTRO' ? "bg-success animate-pulse-soft" : "bg-muted-foreground")} />
+                                      {mov.status === 'DENTRO' ? 'Dentro' : 'Saiu'}
+                                    </span>
+                                    <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                                      {mov.status === 'DENTRO' && (
+                                        <Button
+                                          size="sm"
+                                          variant="destructive"
+                                          onClick={() => setSaidaModal({ open: true, pessoa: { movimentacaoId: mov.id, pessoa: mov.pessoa, entradaEm: mov.entrada_em } })}
+                                          className="gap-1.5"
+                                        >
+                                          <LogOut className="h-3.5 w-3.5" />
+                                          <span>Saída</span>
+                                        </Button>
+                                      )}
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => setEditandoMovimentacao(mov)}
+                                        className="gap-1.5"
+                                      >
+                                        <Edit className="h-3.5 w-3.5" />
+                                        <span>Editar</span>
+                                      </Button>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
 
-                              {/* Right side - Status and actions */}
-                              <div className="flex flex-col items-end gap-3 flex-shrink-0">
-                                <span className={mov.status === 'DENTRO' ? 'status-inside' : 'status-outside'}>
-                                  <span className={cn(
-                                    "h-2 w-2 rounded-full",
-                                    mov.status === 'DENTRO' ? "bg-success animate-pulse-soft" : "bg-muted-foreground"
-                                  )} />
-                                  {mov.status === 'DENTRO' ? 'Dentro' : 'Saiu'}
-                                </span>
+                              {/* Desktop details row */}
+                              <div
+                                id={`details-daily-${mov.id}`}
+                                className="hidden min-[751px]:block p-5 bg-muted/20 border-t border-border"
+                                style={{ display: 'none' }}
+                              >
+                                <div className="flex items-start gap-3">
+                                  <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                                  <div className="flex-1">
+                                    {mov.observacao ? (
+                                      <p className="text-sm text-black whitespace-pre-wrap">{mov.observacao}</p>
+                                    ) : (
+                                      <p className="text-sm text-red-600 font-medium"></p>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                          </div>
-
-                          {/* Linha de detalhes (observação) */}
-                          <div
-                            id={`details-${mov.id}`}
-                            className="p-5 hover:bg-muted/30 transition-colors"
-                            style={{ display: 'none' }}
-                          >
-                            <div className="flex items-start gap-3">
-                              <div className="flex-shrink-0">
-                                <FileText className="h-5 w-5 text-muted-foreground" />
-                              </div>
-                              <div className="flex-1">
-                                {mov.observacao ? (
-                                  <p className="text-sm text-black whitespace-pre-wrap">
-                                    {mov.observacao}
-                                  </p>
-                                ) : (
-                                  <p className="text-sm text-red-600 font-medium">
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </React.Fragment>
-                      ))}
-
-
-
-
-
-                        {/* Pagination for daily view */}
-                        {getTotalPages(movimentacoesPorDia.length, pagination.daily.pageSize) > 1 && (
-                          <div className="flex items-center justify-between mt-6">
-                            <div className="text-sm text-black">
-                              Mostrando dias {Math.min((pagination.daily.page - 1) * pagination.daily.pageSize + 1, movimentacoesPorDia.length)} a{' '}
-                              {Math.min(pagination.daily.page * pagination.daily.pageSize, movimentacoesPorDia.length)} de {movimentacoesPorDia.length}
-                            </div>
-                            <Pagination>
-                              <PaginationContent>
-                                <PaginationItem>
-                                  <PaginationPrevious
-                                    onClick={() => handlePageChange(pagination.daily.page - 1)}
-                                    className={pagination.daily.page <= 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                                  />
-                                </PaginationItem>
-
-                                {/* Page numbers */}
-                                {Array.from({ length: Math.min(5, getTotalPages(movimentacoesPorDia.length, pagination.daily.pageSize)) }, (_, i) => {
-                                  const totalPages = getTotalPages(movimentacoesPorDia.length, pagination.daily.pageSize);
-                                  let pageNum;
-
-                                  if (totalPages <= 5) {
-                                    pageNum = i + 1;
-                                  } else if (pagination.daily.page <= 3) {
-                                    pageNum = i + 1;
-                                  } else if (pagination.daily.page >= totalPages - 2) {
-                                    pageNum = totalPages - 4 + i;
-                                  } else {
-                                    pageNum = pagination.daily.page - 2 + i;
-                                  }
-
-                                  return (
-                                    <PaginationItem key={pageNum}>
-                                      <PaginationLink
-                                        onClick={() => handlePageChange(pageNum)}
-                                        isActive={pagination.daily.page === pageNum}
-                                        className="cursor-pointer"
-                                      >
-                                        {pageNum}
-                                      </PaginationLink>
-                                    </PaginationItem>
-                                  );
-                                })}
-
-                                <PaginationItem>
-                                  <PaginationNext
-                                    onClick={() => handlePageChange(pagination.daily.page + 1)}
-                                    className={pagination.daily.page >= getTotalPages(movimentacoesPorDia.length, pagination.daily.pageSize) ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                                  />
-                                </PaginationItem>
-                              </PaginationContent>
-                            </Pagination>
-                          </div>
-                        )}
+                            </React.Fragment>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
                 ))}
+
+                <PaginationBar
+                  total={movimentacoesPorDia.length}
+                  page={pagination.daily.page}
+                  pageSize={pagination.daily.pageSize}
+                  label="dias"
+                />
               </>
             )}
           </div>
-        ) : (
-          /* List View (Table) */
-          <div className="space-y-4">
 
+        ) : (
+          /* ════════════════════════════════════════════════════════════════
+              LIST VIEW
+          ════════════════════════════════════════════════════════════════ */
+          <div className="space-y-4">
             <div className="card-elevated-md overflow-hidden">
-            {dadosFiltrados.length === 0 ? (
+              {dadosFiltrados.length === 0 ? (
                 <div className="p-12 text-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted mx-auto mb-4">
-                  <History className="h-8 w-8 text-black" />
-                </div>
-                <h4 className="font-medium text-black mb-1">Nenhum registro encontrado</h4>
-                <p className="text-sm text-black">
-                    {hasActiveFilters
-                      ? 'Tente ajustar os filtros de busca'
-                      : 'O histórico aparecerá aqui conforme as movimentações forem registradas'}
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted mx-auto mb-4">
+                    <History className="h-8 w-8 text-black" />
+                  </div>
+                  <h4 className="font-medium text-black mb-1">Nenhum registro encontrado</h4>
+                  <p className="text-sm text-black">
+                    {hasActiveFilters ? 'Tente ajustar os filtros de busca' : 'O histórico aparecerá aqui conforme as movimentações forem registradas'}
                   </p>
                 </div>
               ) : (
                 <>
-                  <div className="overflow-x-auto">
+                  {/* ── Mobile List Cards (≤750px) ── */}
+                  <div className="block min-[751px]:hidden divide-y divide-border">
+                    {getPaginatedItems(dadosFiltrados, pagination.list.page, pagination.list.pageSize).map((mov, index) => {
+                      const isExpanded = expandedListCards.has(mov.id);
+                      return (
+                        <div
+                          key={mov.id}
+                          className="p-3 animate-fade-in cursor-pointer select-none active:bg-muted/40 transition-colors"
+                          style={{ animationDelay: `${index * 30}ms` }}
+                          onClick={() => toggleListCard(mov.id)}
+                        >
+                          {/* Top row */}
+                          <div className="flex items-center gap-3 mb-2">
+                            <UserTypeAvatar pessoa={mov.pessoa} />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-black text-base truncate leading-tight">
+                                {mov.pessoa.nome}
+                              </p>
+                              {/* Observação sempre visível abaixo do nome */}
+                              {mov.observacao ? (
+                                <p className="text-xs text-black/70 mt-0.5 line-clamp-2 whitespace-pre-wrap">
+                                  {mov.observacao}
+                                </p>
+                              ) : (
+                                <p className="text-xs text-red-500 font-medium mt-0.5">⚠️ Observação obrigatória</p>
+                              )}
+                            </div>
+                            {/* Chevron indicator */}
+                            <div className="text-black/40 flex-shrink-0 transition-transform duration-200" style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                              <ChevronDown className="h-4 w-4" />
+                            </div>
+                          </div>
+
+                          {/* Status + tipo + datas — sempre visível */}
+                          <div className="flex items-center gap-2 pl-11 mb-3 flex-wrap text-sm">
+                            {mov.pessoa.tipo && (
+                              <span className="text-xs font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                {mov.pessoa.tipo.charAt(0).toUpperCase() + mov.pessoa.tipo.slice(1)}
+                              </span>
+                            )}
+                            <span className={cn(
+                              "text-xs font-medium flex items-center gap-1",
+                              mov.status === 'DENTRO' ? "text-success" : "text-muted-foreground"
+                            )}>
+                              <span className={cn("h-1.5 w-1.5 rounded-full inline-block", mov.status === 'DENTRO' ? "bg-success animate-pulse-soft" : "bg-muted-foreground")} />
+                              {mov.status === 'DENTRO' ? 'Dentro' : 'Saiu'}
+                            </span>
+                            <span className="flex items-center gap-1 text-xs text-black">
+                              <LogIn className="h-3 w-3 text-success" />
+                              {formatDate(mov.entrada_em)} {formatTime(mov.entrada_em)}
+                            </span>
+                            {mov.saida_em && (
+                              <span className="flex items-center gap-1 text-xs text-black">
+                                <LogOut className="h-3 w-3 text-destructive" />
+                                {formatDate(mov.saida_em)} {formatTime(mov.saida_em)}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Expandable details */}
+                          {isExpanded && (
+                            <div className="pl-11 mb-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
+                              <div>
+                                <p className="text-xs text-black/50 uppercase tracking-wide font-medium mb-0.5">Documento</p>
+                                <p className="text-black text-xs">{mov.pessoa.documento || '—'}</p>
+                              </div>
+                              {(mov.placa || mov.pessoa.placa) && (
+                                <div>
+                                  <p className="text-xs text-black/50 uppercase tracking-wide font-medium mb-0.5">Placa</p>
+                                  <p className="font-mono bg-muted px-2 py-0.5 rounded text-xs inline-block">
+                                    {formatters.placa(mov.placa || mov.pessoa.placa || '')}
+                                  </p>
+                                </div>
+                              )}
+                              {mov.pessoa.contato && (
+                                <div>
+                                  <p className="text-xs text-black/50 uppercase tracking-wide font-medium mb-0.5">Contato</p>
+                                  <p className="text-black text-xs">{mov.pessoa.contato}</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Action buttons — stop propagation */}
+                          <div className="grid grid-cols-2 gap-2" onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              size="default"
+                              variant="outline"
+                              onClick={() => setEditandoMovimentacao(mov)}
+                              className="gap-2 h-11 text-sm font-medium w-full"
+                            >
+                              <Edit className="h-4 w-4" />
+                              Editar
+                            </Button>
+                            {mov.status === 'DENTRO' ? (
+                              <Button
+                                size="default"
+                                variant="destructive"
+                                onClick={() => setSaidaModal({ open: true, pessoa: { movimentacaoId: mov.id, pessoa: mov.pessoa, entradaEm: mov.entrada_em } })}
+                                className="gap-2 h-11 text-sm font-medium w-full"
+                              >
+                                <LogOut className="h-4 w-4" />
+                                Saída
+                              </Button>
+                            ) : (
+                              <div />
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* ── Desktop Table (≥751px) ── */}
+                  <div className="hidden min-[751px]:block overflow-x-auto">
                     <table className="w-full">
                       <thead>
                         <tr className="border-b border-border bg-muted/50">
-                          <th className="text-center py-3 px-5 text-xs font-medium text-black uppercase tracking-wider">
-                            Pessoa
-                          </th>
-                          <th className="text-left py-3 px-5 text-xs font-medium text-black uppercase tracking-wider hidden sm:table-cell">
-                            Documento
-                          </th>
-                          <th className="text-center py-3 px-5 text-xs font-medium text-black uppercase tracking-wider hidden lg:table-cell">
-                            Placa
-                          </th>
-                          <th className="text-center py-3 px-5 text-xs font-medium text-black uppercase tracking-wider">
-                            Entrada
-                          </th>
-                          <th className="text-center py-3 px-5 text-xs font-medium text-black uppercase tracking-wider hidden md:table-cell">
-                            Saída
-                          </th>
-                          <th className="text-left py-3 px-5 text-xs font-medium text-black uppercase tracking-wider">
-                            Status
-                          </th>
-                          <th className="text-center py-3 px-5 text-xs font-medium text-black uppercase tracking-wider">
-                            Ação
-                          </th>
+                          <th className="text-center py-3 px-5 text-xs font-medium text-black uppercase tracking-wider">Pessoa</th>
+                          <th className="text-left py-3 px-5 text-xs font-medium text-black uppercase tracking-wider">Documento</th>
+                          <th className="text-center py-3 px-5 text-xs font-medium text-black uppercase tracking-wider hidden lg:table-cell">Placa</th>
+                          <th className="text-center py-3 px-5 text-xs font-medium text-black uppercase tracking-wider">Entrada</th>
+                          <th className="text-center py-3 px-5 text-xs font-medium text-black uppercase tracking-wider hidden md:table-cell">Saída</th>
+                          <th className="text-left py-3 px-5 text-xs font-medium text-black uppercase tracking-wider">Status</th>
+                          <th className="text-center py-3 px-5 text-xs font-medium text-black uppercase tracking-wider">Ação</th>
                         </tr>
                       </thead>
-<tbody className="divide-y divide-border">
+                      <tbody className="divide-y divide-border">
                         {getPaginatedItems(dadosFiltrados, pagination.list.page, pagination.list.pageSize).map((mov, index) => (
                           <React.Fragment key={mov.id}>
-                            {/* Linha principal */}
                             <tr
-                              key={mov.id}
                               className="hover:bg-muted/30 transition-smooth animate-fade-in cursor-pointer"
                               style={{ animationDelay: `${index * 30}ms` }}
                               onClick={() => {
-                                const details = document.getElementById(`details-${mov.id}`);
+                                const details = document.getElementById(`details-list-${mov.id}`);
                                 if (details) {
-                                  if (details.style.display === 'none' || !details.style.display) {
-                                    details.style.display = 'table-row';
-                                  } else {
-                                    details.style.display = 'none';
-                                  }
+                                  details.style.display = details.style.display === 'none' || !details.style.display ? 'table-row' : 'none';
                                 }
                               }}
                             >
@@ -814,22 +940,14 @@ export function HistoricoPage() {
                                 <div className="flex items-center gap-3">
                                   <UserTypeAvatar pessoa={mov.pessoa} />
                                   <div className="min-w-0">
-                                    <p className="font-medium text-black truncate">
-                                      {mov.pessoa.nome}
-                                    </p>
-                                    {mov.observacao ? (
-                                      <p className="text-xs text-black whitespace-pre-wrap mt-1 max-w-[300px] truncate">
-                                        {mov.observacao}
-                                      </p>
-                                    ) : (
-                                      <p className="text-xs text-black sm:hidden mt-1">
-                                        {mov.pessoa.documento}
-                                      </p>
+                                    <p className="font-medium text-black truncate">{mov.pessoa.nome}</p>
+                                    {mov.observacao && (
+                                      <p className="text-xs text-black whitespace-pre-wrap mt-1 max-w-[300px] truncate">{mov.observacao}</p>
                                     )}
                                   </div>
                                 </div>
                               </td>
-                              <td className="py-4 px-5 hidden sm:table-cell">
+                              <td className="py-4 px-5">
                                 <div className="flex items-center gap-2 text-sm text-black">
                                   <FileText className="h-3.5 w-3.5" />
                                   <span>{mov.pessoa.documento}</span>
@@ -871,65 +989,44 @@ export function HistoricoPage() {
                               </td>
                               <td className="py-4 px-5">
                                 <span className={mov.status === 'DENTRO' ? 'status-inside' : 'status-outside'}>
-                                  <span className={cn(
-                                    "h-1.5 w-1.5 rounded-full",
-                                    mov.status === 'DENTRO' ? "bg-success animate-pulse-soft" : "bg-muted-foreground"
-                                  )} />
+                                  <span className={cn("h-1.5 w-1.5 rounded-full", mov.status === 'DENTRO' ? "bg-success animate-pulse-soft" : "bg-muted-foreground")} />
                                   {mov.status === 'DENTRO' ? 'Dentro' : 'Saiu'}
                                 </span>
                               </td>
                               <td className="py-4 px-5 text-right">
-                                <div className="flex justify-end gap-2">
+                                <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                                   {mov.status === 'DENTRO' && (
                                     <Button
                                       size="sm"
                                       variant="destructive"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSaidaModal({ open: true, pessoa: { movimentacaoId: mov.id, pessoa: mov.pessoa, entradaEm: mov.entrada_em } });
-                                      }}
+                                      onClick={() => setSaidaModal({ open: true, pessoa: { movimentacaoId: mov.id, pessoa: mov.pessoa, entradaEm: mov.entrada_em } })}
                                       className="gap-1.5"
                                     >
                                       <LogOut className="h-3.5 w-3.5" />
-                                      <span className="hidden sm:inline">Saída</span>
+                                      <span>Saída</span>
                                     </Button>
                                   )}
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setEditandoMovimentacao(mov);
-                                    }}
+                                    onClick={() => setEditandoMovimentacao(mov)}
                                     className="gap-1.5"
                                   >
                                     <Edit className="h-3.5 w-3.5" />
-                                    <span className="hidden sm:inline">Editar</span>
+                                    <span>Editar</span>
                                   </Button>
                                 </div>
                               </td>
                             </tr>
-
-                            {/* Linha de detalhes (observação) */}
-                            <tr
-                              id={`details-${mov.id}`}
-                              className="hover:bg-muted/30 transition-smooth"
-                              style={{ display: 'none' }}
-                            >
-                              <td colSpan={6} className="p-4">
+                            <tr id={`details-list-${mov.id}`} className="hover:bg-muted/30 transition-smooth" style={{ display: 'none' }}>
+                              <td colSpan={7} className="p-4">
                                 <div className="flex items-start gap-3">
-                                  <div className="flex-shrink-0">
-                                    <FileText className="h-5 w-5 text-muted-foreground" />
-                                  </div>
+                                  <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                                   <div className="flex-1">
                                     {mov.observacao ? (
-                                      <p className="text-sm text-black whitespace-pre-wrap">
-                                        {mov.observacao}
-                                      </p>
+                                      <p className="text-sm text-black whitespace-pre-wrap">{mov.observacao}</p>
                                     ) : (
-                                      <p className="text-sm text-red-600 font-medium">
-                                        
-                                      </p>
+                                      <p className="text-sm text-red-600 font-medium"></p>
                                     )}
                                   </div>
                                 </div>
@@ -941,60 +1038,12 @@ export function HistoricoPage() {
                     </table>
                   </div>
 
-                    {/* Pagination for list view */}
-                    {getTotalPages(dadosFiltrados.length, pagination.list.pageSize) > 1 && (
-                      <div className="flex items-center justify-between p-4 border-t border-border">
-                        <div className="text-sm text-black">
-                          Mostrando {Math.min((pagination.list.page - 1) * pagination.list.pageSize + 1, dadosFiltrados.length)} a{' '}
-                          {Math.min(pagination.list.page * pagination.list.pageSize, dadosFiltrados.length)} de {dadosFiltrados.length} registros
-                        </div>
-                        <Pagination>
-                          <PaginationContent>
-                            <PaginationItem>
-                              <PaginationPrevious
-                                onClick={() => handlePageChange(pagination.list.page - 1)}
-                                className={pagination.list.page <= 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                              />
-                            </PaginationItem>
-
-                            {/* Page numbers */}
-                            {Array.from({ length: Math.min(5, getTotalPages(dadosFiltrados.length, pagination.list.pageSize)) }, (_, i) => {
-                              const totalPages = getTotalPages(dadosFiltrados.length, pagination.list.pageSize);
-                              let pageNum;
-
-                              if (totalPages <= 5) {
-                                pageNum = i + 1;
-                              } else if (pagination.list.page <= 3) {
-                                pageNum = i + 1;
-                              } else if (pagination.list.page >= totalPages - 2) {
-                                pageNum = totalPages - 4 + i;
-                              } else {
-                                pageNum = pagination.list.page - 2 + i;
-                              }
-
-                              return (
-                                <PaginationItem key={pageNum}>
-                                  <PaginationLink
-                                    onClick={() => handlePageChange(pageNum)}
-                                    isActive={pagination.list.page === pageNum}
-                                    className="cursor-pointer"
-                                  >
-                                    {pageNum}
-                                  </PaginationLink>
-                                </PaginationItem>
-                              );
-                            })}
-
-                            <PaginationItem>
-                              <PaginationNext
-                                onClick={() => handlePageChange(pagination.list.page + 1)}
-                                className={pagination.list.page >= getTotalPages(dadosFiltrados.length, pagination.list.pageSize) ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                              />
-                            </PaginationItem>
-                          </PaginationContent>
-                        </Pagination>
-                      </div>
-                    )}
+                  <PaginationBar
+                    total={dadosFiltrados.length}
+                    page={pagination.list.page}
+                    pageSize={pagination.list.pageSize}
+                    label="registros"
+                  />
                 </>
               )}
             </div>
@@ -1023,9 +1072,7 @@ export function HistoricoPage() {
       <Button
         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
         className={`fixed bottom-6 right-6 w-12 h-12 rounded-full shadow-lg transition-all duration-300 ease-in-out ${
-          showScrollTop 
-            ? 'opacity-100 translate-y-0' 
-            : 'opacity-0 translate-y-10 pointer-events-none'
+          showScrollTop ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'
         }`}
         variant="default"
         size="icon"

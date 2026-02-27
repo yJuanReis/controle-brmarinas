@@ -243,37 +243,44 @@ export function Dashboard() {
                   return (
                     <div
                       key={item.movimentacaoId}
-                      className="p-3 animate-fade-in"
+                      className="p-3 animate-fade-in cursor-pointer select-none active:bg-muted/40 transition-colors"
                       style={{ animationDelay: `${index * 40}ms` }}
+                      onClick={() => toggleCardExpanded(item.movimentacaoId)}
                     >
-                      {/* Top row: avatar + name + entry time */}
-                      <div className="flex items-center gap-3 mb-3">
+                      {/* Top row: avatar + name + chevron */}
+                      <div className="flex items-center gap-3 mb-2">
                         <UserTypeAvatar pessoa={item.pessoa} />
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-black text-base truncate leading-tight">
                             {item.pessoa.nome}
                           </p>
-                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                            {item.pessoa.tipo && (
-                              <span className="text-xs font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                                {item.pessoa.tipo === 'prestador' ? 'Prestador' : item.pessoa.tipo.charAt(0).toUpperCase() + item.pessoa.tipo.slice(1)}
-                              </span>
-                            )}
-                            <span className="flex items-center gap-1 text-xs text-black">
-                              <LogIn className="h-3 w-3 text-success" />
-                              {formatHora(item.entradaEm)}
-                              <span className="text-black/60">· {getTempoDecorrido(item.entradaEm)}</span>
-                            </span>
-                          </div>
+                          {/* Observação sempre visível abaixo do nome */}
+                          {item.observacao ? (
+                            <p className="text-xs text-black/70 mt-0.5 line-clamp-2 whitespace-pre-wrap">
+                              {item.observacao}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-red-500 font-medium mt-0.5">⚠️ Observação obrigatória</p>
+                          )}
                         </div>
-                        {/* Expand toggle */}
-                        <button
-                          onClick={() => toggleCardExpanded(item.movimentacaoId)}
-                          className="p-1.5 rounded-md text-black/50 hover:text-black hover:bg-muted/50 transition-colors flex-shrink-0"
-                          aria-label={isExpanded ? 'Recolher detalhes' : 'Ver detalhes'}
-                        >
-                          {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                        </button>
+                        {/* Chevron indicator */}
+                        <div className="text-black/40 flex-shrink-0 transition-transform duration-200" style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                          <ChevronDown className="h-4 w-4" />
+                        </div>
+                      </div>
+
+                      {/* Tipo + entrada — sempre visível */}
+                      <div className="flex items-center gap-1.5 pl-11 mb-3 flex-wrap">
+                        {item.pessoa.tipo && (
+                          <span className="text-xs font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                            {item.pessoa.tipo === 'prestador' ? 'Prestador' : item.pessoa.tipo.charAt(0).toUpperCase() + item.pessoa.tipo.slice(1)}
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1 text-xs text-black">
+                          <LogIn className="h-3 w-3 text-success" />
+                          {formatHora(item.entradaEm)}
+                          <span className="text-black/60">· {getTempoDecorrido(item.entradaEm)}</span>
+                        </span>
                       </div>
 
                       {/* Expandable details */}
@@ -281,7 +288,7 @@ export function Dashboard() {
                         <div className="mb-3 pl-11 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
                           <div>
                             <p className="text-xs text-black/50 uppercase tracking-wide font-medium mb-0.5">Documento</p>
-                            <p className="text-black">{item.pessoa.documento || '—'}</p>
+                            <p className="text-black text-xs">{item.pessoa.documento || '—'}</p>
                           </div>
                           {(item.placa || item.pessoa.placa) && (
                             <div>
@@ -291,22 +298,11 @@ export function Dashboard() {
                               </p>
                             </div>
                           )}
-                          {item.observacao && (
-                            <div className="col-span-2">
-                              <p className="text-xs text-black/50 uppercase tracking-wide font-medium mb-0.5">Observação</p>
-                              <p className="text-black whitespace-pre-wrap text-xs">{item.observacao}</p>
-                            </div>
-                          )}
-                          {!item.observacao && (
-                            <div className="col-span-2">
-                              <p className="text-xs text-red-500 font-medium">⚠️ Observação obrigatória</p>
-                            </div>
-                          )}
                         </div>
                       )}
 
-                      {/* Action buttons — always visible, full-width, large touch targets */}
-                      <div className="grid grid-cols-2 gap-2">
+                      {/* Action buttons — stop propagation so clicks don't toggle card */}
+                      <div className="grid grid-cols-2 gap-2" onClick={(e) => e.stopPropagation()}>
                         <Button
                           size="default"
                           variant="outline"
@@ -336,9 +332,7 @@ export function Dashboard() {
                 <table className="w-full min-w-[700px]">
                   <thead>
                     <tr className="border-b border-border bg-muted/50">
-                      <th className="text-center py-3 px-2 md:px-5 text-xs font-medium text-black uppercase tracking-wider">
-                        Ação
-                      </th>
+
                       <th className="text-center py-3 px-2 md:px-5 text-xs font-medium text-black uppercase tracking-wider">
                         Pessoa
                       </th>
@@ -354,6 +348,10 @@ export function Dashboard() {
                       <th className="text-center py-3 px-2 md:px-5 text-xs font-medium text-black uppercase tracking-wider">
                         Entrada
                       </th>
+                      <th className="text-center py-3 px-2 md:px-5 text-xs font-medium text-black uppercase tracking-wider">
+                        Ação
+                      </th>
+
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">

@@ -13,8 +13,8 @@ interface ExcluirPessoaModalProps {
   pessoa: {
     id: string;
     nome: string;
-    documento: string;
-    tipo: string;
+    documento?: string;
+    tipo?: string;
   } | null;
 }
 

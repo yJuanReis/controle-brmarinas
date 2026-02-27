@@ -45,6 +45,8 @@ interface MarinaContextType {
 
   // Empresa actions
   deletarEmpresa: (empresaId: string) => Promise<void>;
+  criarEmpresa: (nome: string) => Promise<void>;
+  editarEmpresa: (empresaId: string, dados: { nome?: string; ativa?: boolean }) => Promise<void>;
 
   // Queries
   getPessoasDentro: () => PessoaDentro[];
@@ -425,7 +427,7 @@ export function MarinaProvider({ children }: { children: ReactNode }) {
       const observacaoSaidaPadrao = "Saída finalizada";
       
       if (observacaoSaida !== '') {
-        // Se用户提供 observação de saída, concatenar
+        // Se、提供 observacao de saída, concatenar
         if (observacaoEntrada !== '') {
           updateData.observacao = `${observacaoEntrada} | ${observacaoSaida}`;
         } else {
@@ -826,6 +828,92 @@ export function MarinaProvider({ children }: { children: ReactNode }) {
     }
   }, [authUser?.profile?.role]);
 
+  // Empresa actions
+  const criarEmpresa = useCallback(async (nome: string): Promise<void> => {
+    try {
+      // Verificar se o usuário é owner
+      if (!authUser?.profile || authUser.profile.role !== 'owner') {
+        toast.error('Apenas owners podem criar empresas');
+        throw new Error('Permissão negada');
+      }
+
+      // Validar nome
+      if (!nome || nome.trim() === '') {
+        throw new Error('Nome da empresa é obrigatório');
+      }
+
+      // Gerar ID único para a empresa
+      const empresaId = crypto.randomUUID().replace(/-/g, '').substring(0, 12);
+
+      // Criar empresa no banco
+      const { data: novaEmpresa, error } = await supabase
+        .from('empresas')
+        .insert({
+          id: empresaId,
+          nome: nome.trim(),
+          ativa: true,
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Atualizar estado local
+      setEmpresas(prev => [...prev, novaEmpresa]);
+
+      toast.success('Empresa criada com sucesso!');
+    } catch (err) {
+      const errorMessage = err.message || 'Erro ao criar empresa';
+      toast.error(errorMessage);
+      throw err;
+    }
+  }, [authUser]);
+
+  const editarEmpresa = useCallback(async (empresaId: string, dados: { nome?: string; ativa?: boolean }): Promise<void> => {
+    try {
+      // Verificar se o usuário é owner
+      if (!authUser?.profile || authUser.profile.role !== 'owner') {
+        toast.error('Apenas owners podem editar empresas');
+        throw new Error('Permissão negada');
+      }
+
+      const updateData: any = {};
+      
+      if (dados.nome !== undefined) {
+        if (dados.nome.trim() === '') {
+          throw new Error('Nome da empresa não pode estar vazio');
+        }
+        updateData.nome = dados.nome.trim();
+      }
+      
+      if (dados.ativa !== undefined) {
+        updateData.ativa = dados.ativa;
+      }
+
+      // Atualizar empresa no banco
+      const { data: empresaAtualizada, error } = await supabase
+        .from('empresas')
+        .update(updateData)
+        .eq('id', empresaId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Atualizar estado local
+      setEmpresas(prev => prev.map(e => 
+        e.id === empresaId ? empresaAtualizada : e
+      ));
+
+      toast.success('Empresa atualizada com sucesso!');
+    } catch (err) {
+      const errorMessage = err.message || 'Erro ao editar empresa';
+      toast.error(errorMessage);
+      throw err;
+    }
+  }, [authUser]);
+
   const deletarEmpresa = useCallback(async (empresaId: string): Promise<void> => {
     try {
 
@@ -963,6 +1051,8 @@ return [];
     removerUsuario,
     alterarSenhaUsuario,
     deletarEmpresa,
+    criarEmpresa,
+    editarEmpresa,
     getPessoasDentro,
     getHistoricoMovimentacoes,
     podeEntrar,
@@ -997,6 +1087,8 @@ return [];
     removerUsuario,
     alterarSenhaUsuario,
     deletarEmpresa,
+    criarEmpresa,
+    editarEmpresa,
     getPessoasDentro,
     getHistoricoMovimentacoes,
     podeEntrar,

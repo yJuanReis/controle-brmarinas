@@ -76,7 +76,7 @@ import { AppUser } from '@/types/marina';
 import { APP_VERSION, COMMIT_COUNT } from '@/lib/version';
 
 export function AdminPanel() {
-  const { user, empresaAtual, logout, empresas, pessoas, movimentacoes, getUsuarios, adicionarUsuario, removerUsuario, alterarSenhaUsuario, deletarEmpresa } = useMarina();
+  const { user, empresaAtual, logout, empresas, pessoas, movimentacoes, getUsuarios, adicionarUsuario, removerUsuario, alterarSenhaUsuario, deletarEmpresa, criarEmpresa, editarEmpresa } = useMarina();
   const [showLogoutAlert, setShowLogoutAlert] = useState(false);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [showDeleteAlert, setShowDeleteAlert] = useState<string | null>(null);
@@ -89,6 +89,9 @@ export function AdminPanel() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showRelatoriosModal, setShowRelatoriosModal] = useState(false);
   const [showGerenciarVersaoModal, setShowGerenciarVersaoModal] = useState(false);
+  const [showEmpresaModal, setShowEmpresaModal] = useState(false);
+  const [empresaEditando, setEmpresaEditando] = useState<any>(null);
+  const [empresaForm, setEmpresaForm] = useState({ nome: "", ativa: true });
 
   // Pagination states
   const [empresasCurrentPage, setEmpresasCurrentPage] = useState(1);

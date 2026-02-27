@@ -600,7 +600,7 @@ export function AuditoriaPage() {
                           <td className="py-3 px-4">
                             {registro.tabela === 'pessoas' && (
                               <span className="text-sm font-medium">
-                                {registro.dados_novos?.nome || registro.dados_antigos?.nome || '—'}
+                                {String(registro.dados_novos?.nome || registro.dados_antigos?.nome || '' ) || '—'}
                               </span>
                             )}
                             {registro.tabela === 'movimentacoes' && (
@@ -623,12 +623,12 @@ export function AuditoriaPage() {
                             )}
                             {registro.tabela === 'user_profiles' && (
                               <span className="text-sm font-medium">
-                                {registro.dados_novos?.nome || registro.dados_antigos?.nome || '—'}
+                                {String(registro.dados_novos?.nome || registro.dados_antigos?.nome || '' ) || '—'}
                               </span>
                             )}
                             {registro.tabela === 'empresas' && (
                               <span className="text-sm font-medium">
-                                {registro.dados_novos?.nome || registro.dados_antigos?.nome || '—'}
+                                {String(registro.dados_novos?.nome || registro.dados_antigos?.nome || '' ) || '—'}
                               </span>
                             )}
                           </td>
